@@ -10,6 +10,7 @@ runs:
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
       with:
         primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.nix', 'flake.lock', 'universal-build') }}
+        restore-prefixes-first-match: nix-${{ runner.os }}-${{ runner.arch }}-
 
     - name: Build
       run: ./universal-build build
