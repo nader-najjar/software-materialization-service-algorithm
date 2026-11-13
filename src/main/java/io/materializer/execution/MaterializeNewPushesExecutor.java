@@ -62,7 +62,10 @@ public class MaterializeNewPushesExecutor {
     private void materializeNewPushForRegistration(MaterializerRegistration registration) {
         try {
             Optional<LivePipelineInputs> inputs = livePipelineInputsAdvancer.advance(registration.repositoryName());
-            if (inputs.isEmpty()) { return; }
+            if (inputs.isEmpty()) {
+                LOGGER.info("Skipped materialization for {}: no new pushes", registration.repositoryName());
+                return;
+            }
 
             LivePipelineInputs reconciledInputs = livePipelineInputsReconciler.reconcile(inputs.get());
 
@@ -70,6 +73,7 @@ public class MaterializeNewPushesExecutor {
 
             String materializerRepositoryName = reconciledInputs.materializerRepositorySnapshot().repositoryName();
             workflowPublisher.publish(materializerRepositoryName, workflowYaml);
+            LOGGER.info("Materialized {}", materializerRepositoryName);
 
         } catch (RuntimeException exception) {
             LOGGER.error("Could not materialize {}", registration.repositoryName(), exception);

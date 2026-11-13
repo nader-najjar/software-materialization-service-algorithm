@@ -25,6 +25,8 @@
     <appender-ref ref="CONSOLE"/>
   </logger>
 
+  <logger name="org.hibernate.validator.internal.util.Version" level="WARN"/>
+
   <root level="${LOG_LEVEL}">
     <appender-ref ref="CONSOLE"/>
   </root>
