@@ -1,5 +1,4 @@
 package io.materializer.shared.materializerregistrystore;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -9,9 +8,9 @@ import java.util.List;
 
 import com.google.inject.Inject;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.materializer.environment.EnvironmentVariables;
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistration;
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistry;
+import io.materializer.shared.materializerregistrystore.models.MaterializerRegistryRepository;
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistrySnapshot;
 import io.materializer.shared.utilities.JsonMapperUtility;
 import io.materializer.shared.utilities.JsonSanitizer;
@@ -26,9 +25,12 @@ public class MaterializerRegistryStore {
 
     @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Guice manages the shared GitHub client")
     @Inject
-    public MaterializerRegistryStore(GitHub gitHub, EnvironmentVariables environmentVariables) {
+    public MaterializerRegistryStore(
+            GitHub gitHub,
+            MaterializerRegistryRepository materializerRegistryRepository
+    ) {
         this.gitHub = gitHub;
-        this.registryRepository = environmentVariables.materializerRegistryRepository();
+        this.registryRepository = materializerRegistryRepository.materializerRegistryRepository();
     }
 
     public MaterializerRegistry read() {

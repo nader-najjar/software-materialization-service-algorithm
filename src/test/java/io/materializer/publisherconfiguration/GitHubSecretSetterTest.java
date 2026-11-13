@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import io.materializer.environment.EnvironmentVariables;
+import io.materializer.shared.models.GitHubToken;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,15 +31,10 @@ import static org.mockito.Mockito.when;
 
 class GitHubSecretSetterTest {
 
-    private final EnvironmentVariables environment = new EnvironmentVariables(
-            "test-token",
-            null,
-            null,
-            null,
-            null
-    );
     private final Process process = mock(Process.class);
-    private final GitHubSecretSetter setter = new GitHubSecretSetter(environment);
+    private final GitHubSecretSetter gitHubSecretSetter = new GitHubSecretSetter(
+            new GitHubToken("test-token")
+    );
     private MockedConstruction<ProcessBuilder> builders;
     private IOException startFailure;
 
@@ -71,7 +66,7 @@ class GitHubSecretSetterTest {
         when(process.getOutputStream()).thenReturn(stdin);
         when(process.waitFor()).thenReturn(0);
 
-        setter.setBuildPublisherPrivateKey("owner/repository", "test-key\né\n");
+        gitHubSecretSetter.setBuildPublisherPrivateKey("owner/repository", "test-key\né\n");
 
         assertEquals("test-key\né\n", stdin.toString(StandardCharsets.UTF_8));
         assertCommandAndEnvironment(builders.constructed().getFirst());
@@ -119,7 +114,7 @@ class GitHubSecretSetterTest {
 
         IllegalStateException failure = assertThrows(
                 IllegalStateException.class,
-                () -> setter.setBuildPublisherPrivateKey("owner/repository", "test-key")
+                () -> gitHubSecretSetter.setBuildPublisherPrivateKey("owner/repository", "test-key")
         );
 
         assertEquals("GitHub CLI secret setting failed with exit code 1", failure.getMessage());
@@ -132,7 +127,7 @@ class GitHubSecretSetterTest {
 
         IllegalStateException failure = assertThrows(
                 IllegalStateException.class,
-                () -> setter.setBuildPublisherPrivateKey("owner/repository", "test-key")
+                () -> gitHubSecretSetter.setBuildPublisherPrivateKey("owner/repository", "test-key")
         );
 
         assertEquals("Could not set Build Publisher private key with GitHub CLI", failure.getMessage());
@@ -147,7 +142,7 @@ class GitHubSecretSetterTest {
 
         IllegalStateException failure = assertThrows(
                 IllegalStateException.class,
-                () -> setter.setBuildPublisherPrivateKey("owner/repository", "test-key")
+                () -> gitHubSecretSetter.setBuildPublisherPrivateKey("owner/repository", "test-key")
         );
 
         assertEquals("Could not set Build Publisher private key with GitHub CLI", failure.getMessage());
@@ -171,7 +166,7 @@ class GitHubSecretSetterTest {
     private void assertInterruptedCall() {
         IllegalStateException failure = assertThrows(
                 IllegalStateException.class,
-                () -> setter.setBuildPublisherPrivateKey("owner/repository", "test-key")
+                () -> gitHubSecretSetter.setBuildPublisherPrivateKey("owner/repository", "test-key")
         );
         assertEquals("Interrupted while setting Build Publisher private key", failure.getMessage());
         assertTrue(Thread.currentThread().isInterrupted());

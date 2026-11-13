@@ -1,5 +1,4 @@
 package io.materializer.shared.repositorypushhistory;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -16,7 +15,7 @@ import java.util.regex.Pattern;
 
 import com.google.inject.Inject;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.materializer.environment.EnvironmentVariables;
+import io.materializer.shared.models.GitHubToken;
 import io.materializer.shared.models.RepositorySnapshot;
 import io.materializer.shared.repositorypushhistory.models.RepositoryPush;
 import io.materializer.shared.utilities.HibernateValidatorUtility;
@@ -33,10 +32,14 @@ public class RepositoryPushHistory {
 
     @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Guice manages the shared GitHub client")
     @Inject
-    public RepositoryPushHistory(GitHub gitHub, HttpClient httpClient, EnvironmentVariables environmentVariables) {
+    public RepositoryPushHistory(
+            GitHub gitHub,
+            HttpClient httpClient,
+            GitHubToken gitHubToken
+    ) {
         this.gitHub = gitHub;
         this.httpClient = httpClient;
-        this.githubToken = environmentVariables.githubToken();
+        this.githubToken = gitHubToken.githubToken();
     }
 
     public RepositorySnapshot latestOnDefaultBranch(String repositoryName) {

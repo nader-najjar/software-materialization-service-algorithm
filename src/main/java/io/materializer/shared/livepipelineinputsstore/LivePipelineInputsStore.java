@@ -1,5 +1,4 @@
 package io.materializer.shared.livepipelineinputsstore;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -9,8 +8,8 @@ import java.util.Optional;
 
 import com.google.inject.Inject;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.materializer.environment.EnvironmentVariables;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
+import io.materializer.shared.livepipelineinputsstore.models.PipelineInputsRepository;
 import io.materializer.shared.utilities.JsonMapperUtility;
 import io.materializer.shared.utilities.JsonSanitizer;
 import org.kohsuke.github.GHBranch;
@@ -27,9 +26,12 @@ public final class LivePipelineInputsStore {
 
     @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Guice manages the shared GitHub client")
     @Inject
-    public LivePipelineInputsStore(GitHub gitHub, EnvironmentVariables environmentVariables) {
+    public LivePipelineInputsStore(
+            GitHub gitHub,
+            PipelineInputsRepository pipelineInputsRepository
+    ) {
         this.gitHub = gitHub;
-        this.storageRepository = environmentVariables.livePipelineInputsStoreRepository();
+        this.storageRepository = pipelineInputsRepository.livePipelineInputsStoreRepository();
     }
 
     public Optional<LivePipelineInputs> read(String materializerRepository) {

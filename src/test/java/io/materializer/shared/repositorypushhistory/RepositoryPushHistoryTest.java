@@ -9,7 +9,7 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 
-import io.materializer.environment.EnvironmentVariables;
+import io.materializer.shared.models.GitHubToken;
 import io.materializer.shared.models.RepositorySnapshot;
 import io.materializer.shared.repositorypushhistory.models.RepositoryPush;
 import io.materializer.shared.utilities.JsonMapperUtility;
@@ -40,7 +40,7 @@ class RepositoryPushHistoryTest {
     private final RepositoryPushHistory repositoryPushHistory = new RepositoryPushHistory(
             gitHub,
             httpClient,
-            new EnvironmentVariables("test", REPO, REPO, null, null)
+            new GitHubToken("test")
     );
 
     @Test

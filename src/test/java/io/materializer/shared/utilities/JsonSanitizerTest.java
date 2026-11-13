@@ -1,7 +1,6 @@
 package io.materializer.shared.utilities;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
-import io.materializer.execution.models.ApplicationInput;
+import io.materializer.execution.models.RegisterApplicationInput;
 import jakarta.validation.ValidationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -13,46 +12,46 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class JsonSanitizerTest {
 
-    private static final String INPUT_JSON = "{\"operation\":%s}";
+    private static final String INPUT_JSON = "{\"repositoryName\":%s}";
 
-    private static final String VALID_OPERATION = "\"materialize-new-pushes\"";
+    private static final String VALID_OPERATION = "\"owner/materializer\"";
 
     @Test
     void rejectsNullJSON() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> JsonSanitizer.parseAndValidate(null, ApplicationInput.class)
+                () -> JsonSanitizer.parseAndValidate(null, RegisterApplicationInput.class)
         );
     }
 
     @Test
-    void readsTheRequestedOperation() {
+    void readsTheRequestedRepositoryName() {
         String json = INPUT_JSON.formatted(VALID_OPERATION);
-        ApplicationInput input = JsonSanitizer.parseAndValidate(json, ApplicationInput.class);
+        RegisterApplicationInput input = JsonSanitizer.parseAndValidate(json, RegisterApplicationInput.class);
 
-        assertEquals("materialize-new-pushes", input.operation());
+        assertEquals("owner/materializer", input.repositoryName());
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
         "{",
         "[]",
-        "{\"operation\":\"materialize-new-pushes\",\"operation\":\"other\"}"
+        "{\"repositoryName\":\"owner/materializer\",\"repositoryName\":\"other\"}"
     })
     void rejectsMalformedAndDuplicateJSON(String json) {
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> JsonSanitizer.parseAndValidate(json, ApplicationInput.class)
+                () -> JsonSanitizer.parseAndValidate(json, RegisterApplicationInput.class)
         );
 
         assertInstanceOf(JsonProcessingException.class, exception.getCause());
     }
 
     @Test
-    void rejectsMissingOperationThroughSharedValidation() {
+    void rejectsMissingRepositoryNameThroughSharedValidation() {
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> JsonSanitizer.parseAndValidate("{}", ApplicationInput.class)
+                () -> JsonSanitizer.parseAndValidate("{}", RegisterApplicationInput.class)
         );
 
         assertInstanceOf(ValidationException.class, exception.getCause());
@@ -63,7 +62,7 @@ class JsonSanitizerTest {
         String json = INPUT_JSON.formatted(VALID_OPERATION) + " {}";
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> JsonSanitizer.parseAndValidate(json, ApplicationInput.class)
+                () -> JsonSanitizer.parseAndValidate(json, RegisterApplicationInput.class)
         );
 
         assertInstanceOf(JsonProcessingException.class, exception.getCause());
@@ -73,7 +72,7 @@ class JsonSanitizerTest {
     void rejectsNullInputThroughSharedValidation() {
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> JsonSanitizer.parseAndValidate("null", ApplicationInput.class)
+                () -> JsonSanitizer.parseAndValidate("null", RegisterApplicationInput.class)
         );
 
         assertInstanceOf(ValidationException.class, exception.getCause());
@@ -81,11 +80,11 @@ class JsonSanitizerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"null", "\" \""})
-    void rejectsNullOrBlankOperation(String operation) {
-        String json = INPUT_JSON.formatted(operation);
+    void rejectsNullOrBlankRepositoryName(String repositoryName) {
+        String json = INPUT_JSON.formatted(repositoryName);
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> JsonSanitizer.parseAndValidate(json, ApplicationInput.class)
+                () -> JsonSanitizer.parseAndValidate(json, RegisterApplicationInput.class)
         );
 
         assertInstanceOf(ValidationException.class, exception.getCause());
