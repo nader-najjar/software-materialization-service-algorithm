@@ -1,14 +1,18 @@
 package io.materializer;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import io.materializer.composition.EnvironmentModule;
+import com.google.inject.Stage;
 import io.materializer.composition.GitHubClientsModule;
+import io.materializer.composition.GitHubTokenModule;
+import io.materializer.composition.HttpClientModule;
+import io.materializer.composition.MaterializerRegistryRepositoryModule;
+import io.materializer.composition.PipelineInputsRepositoryModule;
 import io.materializer.composition.StrictGuiceModule;
-import io.materializer.execution.Executor;
+import io.materializer.execution.MaterializeNewPushesExecutor;
+import io.materializer.execution.RegisterExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,16 +37,8 @@ public final class Main {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> stopMain(mainThread), "shutdown-hook"));
 
         int exitCode = 0;
-        Injector injector = null;
         try {
-            injector = Guice.createInjector(
-                    com.google.inject.Stage.PRODUCTION,
-                    new StrictGuiceModule(),
-                    new EnvironmentModule(),
-                    new GitHubClientsModule()
-            );
-            Executor executor = injector.getInstance(Executor.class);
-            executor.execute(args);
+            route(args);
         } catch (Exception exception) {
             logFailure(exception);
             exitCode = 1;
@@ -51,6 +47,48 @@ public final class Main {
         }
 
         System.exit(exitCode);
+    }
+
+    static void route(String[] args) {
+        if (args == null || args.length != 2) {
+            throw new IllegalArgumentException("Expected an operation and a JSON input argument");
+        }
+        if (args[0] == null) {
+            throw new IllegalArgumentException("Operation must not be null");
+        }
+        switch (args[0]) {
+            case "register" -> register(args[1]);
+            case "materialize-new-pushes" -> materializeNewPushes(args[1]);
+            default -> throw new IllegalArgumentException("Unsupported operation: " + args[0]);
+        }
+    }
+
+    private static void register(String json) {
+        Injector injector = Guice.createInjector(
+                Stage.PRODUCTION,
+                new StrictGuiceModule(),
+                new GitHubTokenModule(),
+                new MaterializerRegistryRepositoryModule(),
+                new GitHubClientsModule()
+        );
+        RegisterExecutor registerExecutor = injector.getInstance(RegisterExecutor.class);
+        registerExecutor.execute(json);
+    }
+
+    private static void materializeNewPushes(String json) {
+        Injector injector = Guice.createInjector(
+                Stage.PRODUCTION,
+                new StrictGuiceModule(),
+                new GitHubTokenModule(),
+                new MaterializerRegistryRepositoryModule(),
+                new PipelineInputsRepositoryModule(),
+                new GitHubClientsModule(),
+                new HttpClientModule()
+        );
+        MaterializeNewPushesExecutor materializeNewPushesExecutor = injector.getInstance(
+            MaterializeNewPushesExecutor.class
+        );
+        materializeNewPushesExecutor.execute(json);
     }
 
     private static void logFailure(Exception exception) {

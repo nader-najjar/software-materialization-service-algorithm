@@ -1,5 +1,4 @@
 package io.materializer.livepipelineinputsreconciler;
-
 import java.util.List;
 
 import io.materializer.shared.livepipelinedeclarationfetcher.LivePipelineDeclarationFetcher;
@@ -29,7 +28,7 @@ class LivePipelineInputsReconcilerTest {
             mock(LivePipelineDeclarationFetcher.class);
     private final RepositoryPushHistory repositoryPushHistory = mock(RepositoryPushHistory.class);
     private final LivePipelineInputsStore livePipelineInputsStore = mock(LivePipelineInputsStore.class);
-    private final LivePipelineInputsReconciler reconciler = new LivePipelineInputsReconciler(
+    private final LivePipelineInputsReconciler livePipelineInputsReconciler = new LivePipelineInputsReconciler(
             livePipelineDeclarationFetcher,
             repositoryPushHistory,
             livePipelineInputsStore
@@ -53,7 +52,7 @@ class LivePipelineInputsReconcilerTest {
         RepositorySnapshot newSnapshot = new RepositorySnapshot("owner/new", "main", "b".repeat(40), 43L);
         when(repositoryPushHistory.latest("owner/new", "main")).thenReturn(newSnapshot);
 
-        LivePipelineInputs result = reconciler.reconcile(inputs);
+        LivePipelineInputs result = livePipelineInputsReconciler.reconcile(inputs);
 
         verify(livePipelineInputsStore).write(result);
 
@@ -71,7 +70,7 @@ class LivePipelineInputsReconcilerTest {
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> reconciler.reconcile(inputs)
+                () -> livePipelineInputsReconciler.reconcile(inputs)
         );
 
         assertSame(failure, exception);
@@ -92,7 +91,7 @@ class LivePipelineInputsReconcilerTest {
         when(repositoryPushHistory.latest("owner/first", "Main")).thenReturn(newBranch);
         when(repositoryPushHistory.latest("owner/new", "main")).thenReturn(newRepository);
 
-        LivePipelineInputs result = reconciler.reconcile(previousInputs);
+        LivePipelineInputs result = livePipelineInputsReconciler.reconcile(previousInputs);
         List<RepositorySnapshot> retained = result.declaredRepositorySnapshots();
         verify(livePipelineInputsStore).write(result);
 
@@ -110,7 +109,7 @@ class LivePipelineInputsReconcilerTest {
         RepositorySnapshot invalidSnapshot = new RepositorySnapshot("owner/new", "main", "invalid", 43L);
         prepareNewRepository(invalidSnapshot);
 
-        assertThrows(ValidationException.class, () -> reconciler.reconcile(inputs));
+        assertThrows(ValidationException.class, () -> livePipelineInputsReconciler.reconcile(inputs));
 
         verifyNoInteractions(livePipelineInputsStore);
     }
@@ -125,7 +124,7 @@ class LivePipelineInputsReconcilerTest {
 
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
-                () -> reconciler.reconcile(inputs)
+                () -> livePipelineInputsReconciler.reconcile(inputs)
         );
 
         assertSame(failure, exception);

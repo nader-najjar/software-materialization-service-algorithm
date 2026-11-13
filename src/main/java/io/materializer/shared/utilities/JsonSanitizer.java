@@ -1,5 +1,4 @@
 package io.materializer.shared.utilities;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import jakarta.validation.ValidationException;
 
@@ -24,4 +23,5 @@ public final class JsonSanitizer {
             );
         }
     }
+
 }

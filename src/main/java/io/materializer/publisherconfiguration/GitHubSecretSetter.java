@@ -1,5 +1,4 @@
 package io.materializer.publisherconfiguration;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -8,15 +7,15 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import com.google.inject.Inject;
-import io.materializer.environment.EnvironmentVariables;
+import io.materializer.shared.models.GitHubToken;
 
 public class GitHubSecretSetter {
 
-    private final EnvironmentVariables environmentVariables;
+    private final String githubToken;
 
     @Inject
-    public GitHubSecretSetter(EnvironmentVariables environmentVariables) {
-        this.environmentVariables = environmentVariables;
+    public GitHubSecretSetter(GitHubToken gitHubToken) {
+        this.githubToken = gitHubToken.githubToken();
     }
 
     public void setBuildPublisherPrivateKey(String repositoryName, String privateKey) {
@@ -69,7 +68,7 @@ public class GitHubSecretSetter {
         if (path != null) {
             environment.put("PATH", path);
         }
-        environment.put("GH_TOKEN", environmentVariables.githubToken());
+        environment.put("GH_TOKEN", githubToken);
         environment.put("GH_HOST", "github.com");
         environment.put("GH_PROMPT_DISABLED", "1");
         environment.put("GH_NO_UPDATE_NOTIFIER", "1");

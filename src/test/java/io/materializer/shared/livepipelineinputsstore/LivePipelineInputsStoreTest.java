@@ -7,8 +7,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 
-import io.materializer.environment.EnvironmentVariables;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
+import io.materializer.shared.livepipelineinputsstore.models.PipelineInputsRepository;
 import io.materializer.shared.models.RepositorySnapshot;
 import io.materializer.shared.utilities.JsonMapperUtility;
 import org.junit.jupiter.api.Test;
@@ -38,9 +38,9 @@ class LivePipelineInputsStoreTest {
     private final GitHub gitHub = mock(GitHub.class);
     private final GHRepository repository = mock(GHRepository.class);
     private final GHTree tree = mock(GHTree.class);
-    private final LivePipelineInputsStore store = new LivePipelineInputsStore(
+    private final LivePipelineInputsStore livePipelineInputsStore = new LivePipelineInputsStore(
             gitHub,
-            new EnvironmentVariables("test", "owner/registry", "owner/service", null, null)
+            new PipelineInputsRepository("owner/service")
     );
 
     @Test
@@ -48,12 +48,12 @@ class LivePipelineInputsStoreTest {
         when(gitHub.getRepository("owner/service")).thenReturn(repository);
         when(repository.getBranch("main")).thenThrow(new GHFileNotFoundException());
 
-        assertThrows(UncheckedIOException.class, () -> store.read("owner/materializer"));
+        assertThrows(UncheckedIOException.class, () -> livePipelineInputsStore.read("owner/materializer"));
         LivePipelineInputs inputs = new LivePipelineInputs(
                 new RepositorySnapshot("owner/materializer", "main", "a".repeat(40), 1L),
                 List.of()
         );
-        assertThrows(UncheckedIOException.class, () -> store.write(inputs));
+        assertThrows(UncheckedIOException.class, () -> livePipelineInputsStore.write(inputs));
         verify(repository, never()).createRef(anyString(), anyString());
     }
 
@@ -61,7 +61,7 @@ class LivePipelineInputsStoreTest {
     void returnsEmptyWhenInputsFileIsAbsent() throws IOException {
         prepareBranch();
 
-        assertEquals(Optional.empty(), store.read("owner/materializer"));
+        assertEquals(Optional.empty(), livePipelineInputsStore.read("owner/materializer"));
     }
 
     @Test
@@ -73,7 +73,7 @@ class LivePipelineInputsStoreTest {
         );
         prepareFile(JsonMapperUtility.MAPPER.writeValueAsString(inputs));
 
-        assertEquals(Optional.of(inputs), store.read("OWNER/Materializer"));
+        assertEquals(Optional.of(inputs), livePipelineInputsStore.read("OWNER/Materializer"));
     }
 
     @Test
@@ -81,7 +81,7 @@ class LivePipelineInputsStoreTest {
         prepareBranch();
         prepareFile("{}");
 
-        assertThrows(IllegalArgumentException.class, () -> store.read("owner/materializer"));
+        assertThrows(IllegalArgumentException.class, () -> livePipelineInputsStore.read("owner/materializer"));
     }
 
     @Test
@@ -93,7 +93,7 @@ class LivePipelineInputsStoreTest {
         );
         prepareFile(JsonMapperUtility.MAPPER.writeValueAsString(inputs));
 
-        assertThrows(IllegalArgumentException.class, () -> store.read("owner/materializer"));
+        assertThrows(IllegalArgumentException.class, () -> livePipelineInputsStore.read("owner/materializer"));
     }
 
     @Test
@@ -101,7 +101,7 @@ class LivePipelineInputsStoreTest {
         prepareBranch();
         when(tree.isTruncated()).thenReturn(true);
 
-        assertThrows(UncheckedIOException.class, () -> store.read("owner/materializer"));
+        assertThrows(UncheckedIOException.class, () -> livePipelineInputsStore.read("owner/materializer"));
     }
 
     @Test
@@ -111,7 +111,7 @@ class LivePipelineInputsStoreTest {
         when(tree.getEntry("live-pipeline-inputs/owner/materializer.json")).thenReturn(entry);
         when(entry.getType()).thenReturn("tree");
 
-        assertThrows(UncheckedIOException.class, () -> store.read("owner/materializer"));
+        assertThrows(UncheckedIOException.class, () -> livePipelineInputsStore.read("owner/materializer"));
     }
 
     @Test
@@ -125,7 +125,7 @@ class LivePipelineInputsStoreTest {
                 List.of()
         );
 
-        store.write(inputs);
+        livePipelineInputsStore.write(inputs);
 
         verify(treeBuilder).baseTree("base-tree");
         verify(treeBuilder).add(
@@ -148,7 +148,7 @@ class LivePipelineInputsStoreTest {
                 List.of()
         );
 
-        assertThrows(UncheckedIOException.class, () -> store.write(inputs));
+        assertThrows(UncheckedIOException.class, () -> livePipelineInputsStore.write(inputs));
 
         verify(ref).updateTo("new-commit", false);
         verify(ref, never()).updateTo(anyString(), org.mockito.ArgumentMatchers.eq(true));
