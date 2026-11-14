@@ -1,146 +1,123 @@
 package io.materializer.livepipelineinputsadvancer;
-import java.time.Instant;
+
 import java.util.List;
 import java.util.Optional;
 
-import io.materializer.livepipelineinputsadvancer.models.PushCandidate;
 import io.materializer.shared.livepipelineinputsstore.LivePipelineInputsStore;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
+import io.materializer.shared.models.PushEvent;
 import io.materializer.shared.models.RepositorySnapshot;
-import io.materializer.shared.repositorypushhistory.RepositoryPushHistory;
-import io.materializer.shared.repositorypushhistory.models.RepositoryPush;
-import jakarta.validation.ValidationException;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 class LivePipelineInputsAdvancerTest {
 
-    private final RepositoryPushHistory repositoryPushHistory = mock(RepositoryPushHistory.class);
     private final LivePipelineInputsStore livePipelineInputsStore = mock(LivePipelineInputsStore.class);
     private final LivePipelineInputsAdvancer livePipelineInputsAdvancer = new LivePipelineInputsAdvancer(
-            repositoryPushHistory,
             livePipelineInputsStore
     );
 
     @Test
-    void initializesOnlyTheMaterializerPin() {
-        RepositorySnapshot pin = new RepositorySnapshot("owner/mat", "trunk", "a".repeat(40), 12L);
-        when(repositoryPushHistory.latestOnDefaultBranch("owner/mat")).thenReturn(pin);
-
-        Optional<LivePipelineInputs> result = livePipelineInputsAdvancer.advance("owner/mat");
-
-        verify(livePipelineInputsStore).read("owner/mat");
-        verify(repositoryPushHistory).latestOnDefaultBranch("owner/mat");
-        assertEquals(Optional.of(new LivePipelineInputs(pin, List.of())), result);
-        verify(livePipelineInputsStore).write(result.orElseThrow());
-        verifyNoMoreInteractions(repositoryPushHistory, livePipelineInputsStore);
-    }
-
-    @Test
-    void doesNotSaveInvalidInputs() {
-        when(repositoryPushHistory.latestOnDefaultBranch("owner/mat"))
-                .thenReturn(new RepositorySnapshot("owner/mat", "main", "invalid", 12L));
-
-        assertThrows(ValidationException.class, () -> livePipelineInputsAdvancer.advance("owner/mat"));
-        verify(livePipelineInputsStore).read("owner/mat");
-        verifyNoMoreInteractions(livePipelineInputsStore);
-    }
-
-    @Test
-    void usesTheExistingInputsBranchWithoutInitializingAgain() {
-        RepositorySnapshot pin = new RepositorySnapshot("owner/mat", "main", "a".repeat(40), 12L);
-        when(livePipelineInputsStore.read("owner/mat")).thenReturn(Optional.of(new LivePipelineInputs(pin, List.of())));
-
-        Optional<LivePipelineInputs> result = livePipelineInputsAdvancer.advance("owner/mat");
-
-        verify(livePipelineInputsStore).read("owner/mat");
-        assertEquals(Optional.empty(), result);
-        verify(repositoryPushHistory).since(pin);
-        verifyNoMoreInteractions(livePipelineInputsStore, repositoryPushHistory);
-    }
-
-    @Test
-    void selectsTheOldestPushAcrossAllTrackedRepositories() {
-        RepositorySnapshot mat = new RepositorySnapshot("owner/mat", "main", "a".repeat(40), 1L);
-        RepositorySnapshot first = new RepositorySnapshot("owner/first", "main", "a".repeat(40), 2L);
-        RepositorySnapshot second = new RepositorySnapshot("owner/second", "release", "a".repeat(40), 3L);
-        RepositoryPush matPush = push(10, 30);
-        RepositoryPush firstPush = push(11, 20);
-        RepositoryPush oldest = push(12, 10);
-        when(repositoryPushHistory.since(mat)).thenReturn(List.of(matPush));
-        when(repositoryPushHistory.since(first)).thenReturn(List.of(firstPush));
-        when(repositoryPushHistory.since(second)).thenReturn(List.of(push(13, 40), oldest));
-
-        LivePipelineInputs inputs = new LivePipelineInputs(mat, List.of(first, second));
-        Optional<PushCandidate> selected = livePipelineInputsAdvancer.findOldestPushCandidate(inputs);
-
-        PushCandidate expected = new PushCandidate("owner/second", "release", oldest);
-        assertEquals(Optional.of(expected), selected);
-        verifyNoMoreInteractions(livePipelineInputsStore);
-    }
-
-    @Test
-    void breaksTimestampTiesByPushID() {
-        RepositorySnapshot mat = new RepositorySnapshot("owner/mat", "main", "a".repeat(40), 1L);
-        RepositorySnapshot source = new RepositorySnapshot("owner/source", "main", "a".repeat(40), 2L);
-        RepositoryPush oldest = push(10, 10);
-        when(repositoryPushHistory.since(mat)).thenReturn(List.of(oldest));
-        when(repositoryPushHistory.since(source)).thenReturn(List.of(push(11, 10)));
-
-        LivePipelineInputs inputs = new LivePipelineInputs(mat, List.of(source));
-        Optional<PushCandidate> selected = livePipelineInputsAdvancer.findOldestPushCandidate(inputs);
-
-        PushCandidate expected = new PushCandidate("owner/mat", "main", oldest);
-        assertEquals(Optional.of(expected), selected);
-    }
-
-    @Test
-    void returnsEmptyWhenNoPushesAreAvailable() {
-        RepositorySnapshot mat = new RepositorySnapshot("owner/mat", "main", "a".repeat(40), 1L);
+    void initializesFromTheSuppliedPipelinePush() {
+        LivePipelineInputs result = livePipelineInputsAdvancer.advance(
+                "owner/pipeline",
+                push("owner/pipeline", "a", "b")
+        );
 
         assertEquals(
-                Optional.empty(),
-                livePipelineInputsAdvancer.findOldestPushCandidate(new LivePipelineInputs(mat, List.of()))
+                new RepositorySnapshot("owner/pipeline", "main", "b".repeat(40)),
+                result.materializerRepositorySnapshot()
         );
+        assertEquals(List.of(), result.declaredRepositorySnapshots());
+        verify(livePipelineInputsStore).write(result);
+    }
+
+    @Test
+    void updatesOnlyThePushedSourceAndAllowsPublicationRetries() {
+        RepositorySnapshot pipeline = new RepositorySnapshot("owner/pipeline", "main", "c".repeat(40));
+        RepositorySnapshot source = new RepositorySnapshot("owner/source", "main", "a".repeat(40));
+        when(livePipelineInputsStore.read("owner/pipeline")).thenReturn(
+                Optional.of(new LivePipelineInputs(pipeline, List.of(source)))
+        );
+
+        LivePipelineInputs result = livePipelineInputsAdvancer.advance(
+                "owner/pipeline",
+                push("owner/source", "a", "b")
+        );
+
+        assertEquals(pipeline, result.materializerRepositorySnapshot());
+        assertEquals("b".repeat(40), result.declaredRepositorySnapshots().getFirst().commitSHA());
+        verify(livePipelineInputsStore).write(result);
+        when(livePipelineInputsStore.read("owner/pipeline")).thenReturn(Optional.of(result));
+        assertEquals(result, livePipelineInputsAdvancer.advance("owner/pipeline", push("owner/source", "a", "b")));
+    }
+
+    @Test
+    void rejectsUntrackedPushesWithoutSaving() {
+        RepositorySnapshot pipeline = new RepositorySnapshot("owner/pipeline", "main", "a".repeat(40));
+        when(livePipelineInputsStore.read("owner/pipeline")).thenReturn(
+                Optional.of(new LivePipelineInputs(pipeline, List.of()))
+        );
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> livePipelineInputsAdvancer.advance("owner/pipeline", push("owner/unknown", "a", "b"))
+        );
+        verify(livePipelineInputsStore, never()).write(any());
+    }
+
+    @Test
+    void acceptsPushWhoseBeforeRevisionDoesNotMatchTheSavedSnapshot() {
+        RepositorySnapshot pipeline = new RepositorySnapshot("owner/pipeline", "main", "a".repeat(40));
+        when(livePipelineInputsStore.read("owner/pipeline")).thenReturn(
+                Optional.of(new LivePipelineInputs(pipeline, List.of()))
+        );
+
+        LivePipelineInputs result = livePipelineInputsAdvancer.advance(
+                "owner/pipeline",
+                push("owner/pipeline", "c", "b")
+        );
+
+        assertEquals("b".repeat(40), result.materializerRepositorySnapshot().commitSHA());
+        verify(livePipelineInputsStore).write(result);
+    }
+
+    @Test
+    void rejectsSourceInitializationAndBranchDeletion() {
+        assertThrows(
+                IllegalStateException.class,
+                () -> livePipelineInputsAdvancer.advance("owner/pipeline", push("owner/source", "a", "b"))
+        );
+        PushEvent deletion = new PushEvent(
+                new PushEvent.Repository("owner/pipeline"),
+                "refs/heads/main",
+                "a".repeat(40),
+                "0".repeat(40),
+                true
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> livePipelineInputsAdvancer.advance("owner/pipeline", deletion)
+        );
+        verify(livePipelineInputsStore).read("owner/pipeline");
         verifyNoMoreInteractions(livePipelineInputsStore);
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void savesOnlyTheSelectedRepositoryUpdate(boolean updateMaterializer) {
-        RepositorySnapshot mat = new RepositorySnapshot("owner/mat", "main", "a".repeat(40), 1L);
-        RepositorySnapshot source = new RepositorySnapshot("owner/source", "release", "a".repeat(40), 2L);
-        LivePipelineInputs inputs = new LivePipelineInputs(mat, List.of(source));
-        RepositorySnapshot selected = updateMaterializer ? mat : source;
-        when(livePipelineInputsStore.read("owner/mat")).thenReturn(Optional.of(inputs));
-        when(repositoryPushHistory.since(selected)).thenReturn(List.of(push(10, 10), push(11, 20)));
-        RepositorySnapshot updated = new RepositorySnapshot(
-                selected.repositoryName(),
-                selected.branch(),
-                "b".repeat(40),
-                10L
+    private PushEvent push(String repository, String before, String after) {
+        return new PushEvent(
+                new PushEvent.Repository(repository),
+                "refs/heads/main",
+                before.repeat(40),
+                after.repeat(40),
+                false
         );
-        LivePipelineInputs expected = updateMaterializer
-                ? new LivePipelineInputs(updated, List.of(source))
-                : new LivePipelineInputs(mat, List.of(updated));
-
-        Optional<LivePipelineInputs> result = livePipelineInputsAdvancer.advance("owner/mat");
-
-        verify(livePipelineInputsStore).read("owner/mat");
-        assertEquals(Optional.of(expected), result);
-        verify(livePipelineInputsStore).write(expected);
-        verifyNoMoreInteractions(livePipelineInputsStore);
-    }
-
-    private RepositoryPush push(long id, long seconds) {
-        return new RepositoryPush(id, "a".repeat(40), "b".repeat(40), Instant.ofEpochSecond(seconds).toString());
     }
 }

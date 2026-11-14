@@ -7,9 +7,9 @@ import java.util.Locale;
 import java.util.Optional;
 
 import com.google.inject.Inject;
+import com.google.inject.name.Named;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
-import io.materializer.shared.livepipelineinputsstore.models.PipelineInputsRepository;
 import io.materializer.shared.utilities.JsonMapperUtility;
 import io.materializer.shared.utilities.JsonSanitizer;
 import org.kohsuke.github.GHBranch;
@@ -28,10 +28,10 @@ public final class LivePipelineInputsStore {
     @Inject
     public LivePipelineInputsStore(
             GitHub gitHub,
-            PipelineInputsRepository pipelineInputsRepository
+            @Named("pipelineInputsRepository") String pipelineInputsRepository
     ) {
         this.gitHub = gitHub;
-        this.storageRepository = pipelineInputsRepository.livePipelineInputsStoreRepository();
+        this.storageRepository = pipelineInputsRepository;
     }
 
     public Optional<LivePipelineInputs> read(String materializerRepository) {

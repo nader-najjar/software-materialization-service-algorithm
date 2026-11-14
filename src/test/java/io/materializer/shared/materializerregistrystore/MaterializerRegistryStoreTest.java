@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistration;
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistry;
-import io.materializer.shared.materializerregistrystore.models.MaterializerRegistryRepository;
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistrySnapshot;
 import io.materializer.shared.utilities.JsonMapperUtility;
 import org.junit.jupiter.api.Test;
@@ -36,7 +35,7 @@ class MaterializerRegistryStoreTest {
 
     private final MaterializerRegistryStore materializerRegistryStore = new MaterializerRegistryStore(
             gitHub,
-            new MaterializerRegistryRepository(REGISTRY_REPOSITORY)
+            REGISTRY_REPOSITORY
     );
 
     @Test

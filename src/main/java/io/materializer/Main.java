@@ -6,12 +6,11 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Stage;
 import io.materializer.composition.GitHubClientsModule;
-import io.materializer.composition.GitHubTokenModule;
 import io.materializer.composition.HttpClientModule;
-import io.materializer.composition.MaterializerRegistryRepositoryModule;
-import io.materializer.composition.PipelineInputsRepositoryModule;
+import io.materializer.composition.MaterializationEnvironmentModule;
+import io.materializer.composition.RegistrationEnvironmentModule;
 import io.materializer.composition.StrictGuiceModule;
-import io.materializer.execution.MaterializeNewPushesExecutor;
+import io.materializer.execution.MaterializeSoftwareExecutor;
 import io.materializer.execution.RegisterExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +57,7 @@ public final class Main {
         }
         switch (args[0]) {
             case "register" -> register(args[1]);
-            case "materialize-new-pushes" -> materializeNewPushes(args[1]);
+            case "materialize-software" -> materializeSoftware(args[1]);
             default -> throw new IllegalArgumentException("Unsupported operation: " + args[0]);
         }
     }
@@ -67,28 +66,26 @@ public final class Main {
         Injector injector = Guice.createInjector(
                 Stage.PRODUCTION,
                 new StrictGuiceModule(),
-                new GitHubTokenModule(),
-                new MaterializerRegistryRepositoryModule(),
-                new GitHubClientsModule()
+                new RegistrationEnvironmentModule(),
+                new GitHubClientsModule(),
+                new HttpClientModule()
         );
         RegisterExecutor registerExecutor = injector.getInstance(RegisterExecutor.class);
         registerExecutor.execute(json);
     }
 
-    private static void materializeNewPushes(String json) {
+    private static void materializeSoftware(String json) {
         Injector injector = Guice.createInjector(
                 Stage.PRODUCTION,
                 new StrictGuiceModule(),
-                new GitHubTokenModule(),
-                new MaterializerRegistryRepositoryModule(),
-                new PipelineInputsRepositoryModule(),
+                new MaterializationEnvironmentModule(),
                 new GitHubClientsModule(),
                 new HttpClientModule()
         );
-        MaterializeNewPushesExecutor materializeNewPushesExecutor = injector.getInstance(
-            MaterializeNewPushesExecutor.class
+        MaterializeSoftwareExecutor materializeSoftwareExecutor = injector.getInstance(
+            MaterializeSoftwareExecutor.class
         );
-        materializeNewPushesExecutor.execute(json);
+        materializeSoftwareExecutor.execute(json);
     }
 
     private static void logFailure(Exception exception) {

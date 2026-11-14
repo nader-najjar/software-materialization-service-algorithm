@@ -3,12 +3,11 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Stage;
 import io.materializer.composition.GitHubClientsModule;
-import io.materializer.composition.GitHubTokenModule;
 import io.materializer.composition.HttpClientModule;
-import io.materializer.composition.MaterializerRegistryRepositoryModule;
-import io.materializer.composition.PipelineInputsRepositoryModule;
+import io.materializer.composition.MaterializationEnvironmentModule;
+import io.materializer.composition.RegistrationEnvironmentModule;
 import io.materializer.composition.StrictGuiceModule;
-import io.materializer.execution.MaterializeNewPushesExecutor;
+import io.materializer.execution.MaterializeSoftwareExecutor;
 import io.materializer.execution.RegisterExecutor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,9 +32,9 @@ class MainRoutingTest {
             guice.when(() -> Guice.createInjector(
                     eq(Stage.PRODUCTION),
                     any(StrictGuiceModule.class),
-                    any(GitHubTokenModule.class),
-                    any(MaterializerRegistryRepositoryModule.class),
-                    any(GitHubClientsModule.class)
+                    any(RegistrationEnvironmentModule.class),
+                    any(GitHubClientsModule.class),
+                    any(HttpClientModule.class)
             ))
                     .thenReturn(injector);
 
@@ -45,9 +44,9 @@ class MainRoutingTest {
             guice.verify(() -> Guice.createInjector(
                     eq(Stage.PRODUCTION),
                     any(StrictGuiceModule.class),
-                    any(GitHubTokenModule.class),
-                    any(MaterializerRegistryRepositoryModule.class),
-                    any(GitHubClientsModule.class)
+                    any(RegistrationEnvironmentModule.class),
+                    any(GitHubClientsModule.class),
+                    any(HttpClientModule.class)
             ));
             guice.verifyNoMoreInteractions();
         }
@@ -56,29 +55,25 @@ class MainRoutingTest {
     @Test
     void constructsOnlyMaterializationComposition() {
         Injector injector = mock(Injector.class);
-        MaterializeNewPushesExecutor materializeNewPushesExecutor = mock(MaterializeNewPushesExecutor.class);
-        when(injector.getInstance(MaterializeNewPushesExecutor.class)).thenReturn(materializeNewPushesExecutor);
+        MaterializeSoftwareExecutor materializeSoftwareExecutor = mock(MaterializeSoftwareExecutor.class);
+        when(injector.getInstance(MaterializeSoftwareExecutor.class)).thenReturn(materializeSoftwareExecutor);
         try (var guice = mockStatic(Guice.class)) {
             guice.when(() -> Guice.createInjector(
                     eq(Stage.PRODUCTION),
                     any(StrictGuiceModule.class),
-                    any(GitHubTokenModule.class),
-                    any(MaterializerRegistryRepositoryModule.class),
-                    any(PipelineInputsRepositoryModule.class),
+                    any(MaterializationEnvironmentModule.class),
                     any(GitHubClientsModule.class),
                     any(HttpClientModule.class)
             ))
                     .thenReturn(injector);
 
-            Main.route(new String[] {"materialize-new-pushes", "{}"});
+            Main.route(new String[] {"materialize-software", "{}"});
 
-            verify(materializeNewPushesExecutor).execute("{}");
+            verify(materializeSoftwareExecutor).execute("{}");
             guice.verify(() -> Guice.createInjector(
                     eq(Stage.PRODUCTION),
                     any(StrictGuiceModule.class),
-                    any(GitHubTokenModule.class),
-                    any(MaterializerRegistryRepositoryModule.class),
-                    any(PipelineInputsRepositoryModule.class),
+                    any(MaterializationEnvironmentModule.class),
                     any(GitHubClientsModule.class),
                     any(HttpClientModule.class)
             ));
