@@ -18,10 +18,9 @@ class LivePipelineInputsTest {
     private final RepositorySnapshot materializer = new RepositorySnapshot(
             "owner/materializer",
             "main",
-            "a".repeat(40),
-            42L
+            "a".repeat(40)
     );
-    private final RepositorySnapshot source = new RepositorySnapshot("owner/source", "release", "c".repeat(40), 42L);
+    private final RepositorySnapshot source = new RepositorySnapshot("owner/source", "release", "c".repeat(40));
 
     @Test
     void preservesAllRepositorySnapshotsThroughJSONRoundTrip() throws IOException {
@@ -64,7 +63,7 @@ class LivePipelineInputsTest {
 
     @Test
     void rejectsInvalidNestedRepositorySnapshots() {
-        RepositorySnapshot invalid = new RepositorySnapshot("missing-owner", "main", "main", 42L);
+        RepositorySnapshot invalid = new RepositorySnapshot("missing-owner", "main", "main");
         LivePipelineInputs snapshot = new LivePipelineInputs(materializer, List.of(invalid));
 
         assertThrows(ValidationException.class, () -> HibernateValidatorUtility.validate(snapshot));

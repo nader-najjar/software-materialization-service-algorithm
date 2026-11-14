@@ -7,10 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.inject.Inject;
+import com.google.inject.name.Named;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistration;
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistry;
-import io.materializer.shared.materializerregistrystore.models.MaterializerRegistryRepository;
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistrySnapshot;
 import io.materializer.shared.utilities.JsonMapperUtility;
 import io.materializer.shared.utilities.JsonSanitizer;
@@ -27,10 +27,10 @@ public class MaterializerRegistryStore {
     @Inject
     public MaterializerRegistryStore(
             GitHub gitHub,
-            MaterializerRegistryRepository materializerRegistryRepository
+            @Named("materializerRegistryRepository") String materializerRegistryRepository
     ) {
         this.gitHub = gitHub;
-        this.registryRepository = materializerRegistryRepository.materializerRegistryRepository();
+        this.registryRepository = materializerRegistryRepository;
     }
 
     public MaterializerRegistry read() {

@@ -1,21 +1,23 @@
 package io.materializer.livepipelineinputsreconciler;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 
 import io.materializer.shared.livepipelinedeclarationfetcher.LivePipelineDeclarationFetcher;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineInput;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.LivePipelineDeclaration;
-import io.materializer.shared.livepipelineinputsstore.LivePipelineInputsStore;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
 import io.materializer.shared.models.RepositorySnapshot;
-import io.materializer.shared.repositorypushhistory.RepositoryPushHistory;
 import jakarta.validation.ValidationException;
 import org.junit.jupiter.api.Test;
+import org.kohsuke.github.GHBranch;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHub;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -26,39 +28,35 @@ class LivePipelineInputsReconcilerTest {
 
     private final LivePipelineDeclarationFetcher livePipelineDeclarationFetcher =
             mock(LivePipelineDeclarationFetcher.class);
-    private final RepositoryPushHistory repositoryPushHistory = mock(RepositoryPushHistory.class);
-    private final LivePipelineInputsStore livePipelineInputsStore = mock(LivePipelineInputsStore.class);
+    private final GitHub gitHub = mock(GitHub.class);
     private final LivePipelineInputsReconciler livePipelineInputsReconciler = new LivePipelineInputsReconciler(
             livePipelineDeclarationFetcher,
-            repositoryPushHistory,
-            livePipelineInputsStore
+            gitHub
     );
     private final RepositorySnapshot materializerSnapshot = new RepositorySnapshot(
             "owner/materializer",
             "main",
-            "a".repeat(40),
-            42L
+            "a".repeat(40)
     );
     private final LivePipelineInputs inputs = new LivePipelineInputs(materializerSnapshot, List.of());
 
     @Test
-    void fetchesAndValidatesThePinnedMaterializerDeclaration() {
+    void fetchesAndValidatesThePinnedMaterializerDeclaration() throws IOException {
         LivePipelineDeclaration declaration = new LivePipelineDeclaration(
                 List.of(declaredInput("owner/new", "main")),
                 List.of(new DeclaredPipelineStep("Build", "build"))
         );
         when(livePipelineDeclarationFetcher.fetchAndValidate(materializerSnapshot)).thenReturn(declaration);
 
-        RepositorySnapshot newSnapshot = new RepositorySnapshot("owner/new", "main", "b".repeat(40), 43L);
-        when(repositoryPushHistory.latest("owner/new", "main")).thenReturn(newSnapshot);
+        RepositorySnapshot newSnapshot = new RepositorySnapshot("owner/new", "main", "b".repeat(40));
+        prepareLatestSnapshot(newSnapshot);
 
         LivePipelineInputs result = livePipelineInputsReconciler.reconcile(inputs);
 
-        verify(livePipelineInputsStore).write(result);
 
         assertEquals(new LivePipelineInputs(materializerSnapshot, List.of(newSnapshot)), result);
-        verify(repositoryPushHistory).latest("owner/new", "main");
-        verifyNoMoreInteractions(repositoryPushHistory);
+        verify(gitHub).getRepository("owner/new");
+        verifyNoMoreInteractions(gitHub);
         verify(livePipelineDeclarationFetcher).fetchAndValidate(materializerSnapshot);
         verifyNoMoreInteractions(livePipelineDeclarationFetcher);
     }
@@ -74,60 +72,58 @@ class LivePipelineInputsReconcilerTest {
         );
 
         assertSame(failure, exception);
-        verifyNoInteractions(repositoryPushHistory, livePipelineInputsStore);
+        verifyNoInteractions(gitHub);
     }
 
     @Test
-    void retainsMatchingPinsAndFetchesOnlyNewRepositoryBranches() {
-        RepositorySnapshot first = new RepositorySnapshot("owner/first", "main", "b".repeat(40), 10L);
-        RepositorySnapshot second = new RepositorySnapshot("owner/second", "release", "c".repeat(40), 11L);
-        RepositorySnapshot removed = new RepositorySnapshot("owner/removed", "main", "d".repeat(40), 12L);
+    void retainsMatchingPinsAndFetchesOnlyNewRepositoryBranches() throws IOException {
+        RepositorySnapshot first = new RepositorySnapshot("owner/first", "main", "b".repeat(40));
+        RepositorySnapshot second = new RepositorySnapshot("owner/second", "release", "c".repeat(40));
+        RepositorySnapshot removed = new RepositorySnapshot("owner/removed", "main", "d".repeat(40));
         prepareChangedDeclaration();
         List<RepositorySnapshot> previousSnapshots = List.of(first, second, removed);
         LivePipelineInputs previousInputs = new LivePipelineInputs(materializerSnapshot, previousSnapshots);
 
-        RepositorySnapshot newBranch = new RepositorySnapshot("owner/first", "Main", "e".repeat(40), 13L);
-        RepositorySnapshot newRepository = new RepositorySnapshot("owner/new", "main", "f".repeat(40), 14L);
-        when(repositoryPushHistory.latest("owner/first", "Main")).thenReturn(newBranch);
-        when(repositoryPushHistory.latest("owner/new", "main")).thenReturn(newRepository);
+        RepositorySnapshot newBranch = new RepositorySnapshot("owner/first", "Main", "e".repeat(40));
+        RepositorySnapshot newRepository = new RepositorySnapshot("owner/new", "main", "f".repeat(40));
+        prepareLatestSnapshot(newBranch);
+        prepareLatestSnapshot(newRepository);
 
         LivePipelineInputs result = livePipelineInputsReconciler.reconcile(previousInputs);
         List<RepositorySnapshot> retained = result.declaredRepositorySnapshots();
-        verify(livePipelineInputsStore).write(result);
 
         assertSame(materializerSnapshot, result.materializerRepositorySnapshot());
         assertEquals(List.of(second, first, newBranch, newRepository), retained);
         assertSame(second, retained.get(0));
         assertSame(first, retained.get(1));
-        verify(repositoryPushHistory).latest("owner/first", "Main");
-        verify(repositoryPushHistory).latest("owner/new", "main");
-        verifyNoMoreInteractions(repositoryPushHistory);
+        verify(gitHub).getRepository("owner/first");
+        verify(gitHub).getRepository("owner/new");
+        verifyNoMoreInteractions(gitHub);
     }
 
     @Test
-    void doesNotSaveInvalidReconciledInputs() {
-        RepositorySnapshot invalidSnapshot = new RepositorySnapshot("owner/new", "main", "invalid", 43L);
+    void rejectsInvalidReconciledInputs() throws IOException {
+        RepositorySnapshot invalidSnapshot = new RepositorySnapshot("owner/new", "main", "invalid");
         prepareNewRepository(invalidSnapshot);
 
         assertThrows(ValidationException.class, () -> livePipelineInputsReconciler.reconcile(inputs));
 
-        verifyNoInteractions(livePipelineInputsStore);
     }
 
     @Test
-    void propagatesSaveFailures() {
-        RepositorySnapshot snapshot = new RepositorySnapshot("owner/new", "main", "b".repeat(40), 43L);
-        prepareNewRepository(snapshot);
-        LivePipelineInputs expected = new LivePipelineInputs(materializerSnapshot, List.of(snapshot));
-        IllegalStateException failure = new IllegalStateException("Could not save inputs");
-        doThrow(failure).when(livePipelineInputsStore).write(expected);
+    void propagatesLatestSnapshotLookupFailure() throws IOException {
+        prepareNewRepository(new RepositorySnapshot("owner/new", "main", "b".repeat(40)));
+        when(gitHub.getRepository("owner/new")).thenThrow(new IOException("Repository unavailable"));
 
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> livePipelineInputsReconciler.reconcile(inputs)
-        );
+        assertThrows(UncheckedIOException.class, () -> livePipelineInputsReconciler.reconcile(inputs));
+    }
 
-        assertSame(failure, exception);
+    private void prepareLatestSnapshot(RepositorySnapshot snapshot) throws IOException {
+        GHRepository repository = mock(GHRepository.class);
+        GHBranch branch = mock(GHBranch.class);
+        when(gitHub.getRepository(snapshot.repositoryName())).thenReturn(repository);
+        when(repository.getBranch(snapshot.branch())).thenReturn(branch);
+        when(branch.getSHA1()).thenReturn(snapshot.commitSHA());
     }
 
     private void prepareChangedDeclaration() {
@@ -145,13 +141,13 @@ class LivePipelineInputsReconcilerTest {
         when(livePipelineDeclarationFetcher.fetchAndValidate(materializerSnapshot)).thenReturn(declaration);
     }
 
-    private void prepareNewRepository(RepositorySnapshot snapshot) {
+    private void prepareNewRepository(RepositorySnapshot snapshot) throws IOException {
         LivePipelineDeclaration declaration = new LivePipelineDeclaration(
                 List.of(declaredInput("owner/new", "main")),
                 List.of(new DeclaredPipelineStep("Build", "build"))
         );
         when(livePipelineDeclarationFetcher.fetchAndValidate(materializerSnapshot)).thenReturn(declaration);
-        when(repositoryPushHistory.latest("owner/new", "main")).thenReturn(snapshot);
+        prepareLatestSnapshot(snapshot);
     }
 
     private DeclaredPipelineInput declaredInput(String repositoryName, String branch) {

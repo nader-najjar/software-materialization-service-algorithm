@@ -1,0 +1,56 @@
+package io.materializer.notifyserviceworkflowgeneration;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.inject.Inject;
+import com.google.inject.name.Named;
+import io.materializer.shared.utilities.ResourceUtility;
+import io.materializer.shared.utilities.YamlMapperUtility;
+
+public class NotifyServiceWorkflowGenerator {
+
+    private final String serviceRepository;
+
+    @Inject
+    public NotifyServiceWorkflowGenerator(@Named("materializationServiceRepository") String serviceRepository) {
+        this.serviceRepository = serviceRepository;
+    }
+
+    public String generate(String pipelineRepository, String branch) {
+        return generate(
+                pipelineRepository,
+                branch,
+                "MATERIALIZATION_DISPATCH_CLIENT_ID",
+                "MATERIALIZATION_DISPATCH_PRIVATE_KEY"
+        );
+    }
+
+    public String generate(
+            String pipelineRepository,
+            String branch,
+            String clientIDVariable,
+            String privateKeySecret
+    ) {
+        String template = ResourceUtility.readString("/notifyserviceworkflowgeneration/notify-service.yml");
+        try {
+            JsonNode workflow = YamlMapperUtility.MAPPER.readTree(template);
+
+            ObjectNode environment = (ObjectNode) workflow.required("env");
+            String[] repositoryParts = serviceRepository.split("/", 2);
+            environment.put("SERVICE_OWNER", repositoryParts[0]);
+            environment.put("SERVICE_REPOSITORY", repositoryParts[1]);
+            environment.put("PIPELINE_REPOSITORY", pipelineRepository);
+
+            ObjectNode push = (ObjectNode) workflow.required("on").required("push");
+            push.putArray("branches").add(branch);
+            ObjectNode token = (ObjectNode) workflow.at("/jobs/notify-service/steps/0/with");
+            token.put("client-id", "${{ vars." + clientIDVariable + " }}");
+            token.put("private-key", "${{ secrets." + privateKeySecret + " }}");
+            return YamlMapperUtility.MAPPER.writeValueAsString(workflow);
+
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Could not generate notify service workflow", exception);
+        }
+    }
+}

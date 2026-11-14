@@ -27,8 +27,7 @@ class LivePipelineDeclarationFetcherTest {
     private final RepositorySnapshot materializerSnapshot = new RepositorySnapshot(
             "owner/materializer",
             "main",
-            "a".repeat(40),
-            42L
+            "a".repeat(40)
     );
 
     @Test

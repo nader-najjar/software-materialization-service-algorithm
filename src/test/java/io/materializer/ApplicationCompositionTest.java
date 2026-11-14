@@ -5,19 +5,16 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Stage;
+import com.google.inject.name.Names;
 import com.google.inject.util.Modules;
 import io.materializer.composition.GitHubClientsModule;
-import io.materializer.composition.GitHubTokenModule;
 import io.materializer.composition.HttpClientModule;
-import io.materializer.composition.MaterializerRegistryRepositoryModule;
-import io.materializer.composition.PipelineInputsRepositoryModule;
+import io.materializer.composition.MaterializationEnvironmentModule;
+import io.materializer.composition.RegistrationEnvironmentModule;
 import io.materializer.composition.StrictGuiceModule;
-import io.materializer.execution.MaterializeNewPushesExecutor;
+import io.materializer.execution.MaterializeSoftwareExecutor;
 import io.materializer.execution.RegisterExecutor;
-import io.materializer.publisherconfiguration.PublisherConfigurator;
-import io.materializer.shared.livepipelineinputsstore.models.PipelineInputsRepository;
-import io.materializer.shared.materializerregistrystore.models.MaterializerRegistryRepository;
-import io.materializer.shared.models.GitHubToken;
+import io.materializer.shared.githubcredentialstore.GitHubCredentialStore;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GitHub;
 
@@ -33,22 +30,35 @@ class ApplicationCompositionTest {
                 Stage.PRODUCTION,
                 Modules.override(
                         new StrictGuiceModule(),
-                        new GitHubTokenModule(),
-                        new MaterializerRegistryRepositoryModule(),
-                        new GitHubClientsModule()
+                        new RegistrationEnvironmentModule(),
+                        new GitHubClientsModule(),
+                        new HttpClientModule()
                 ).with(binder -> {
-                    binder.bind(GitHubToken.class).toInstance(new GitHubToken("token"));
-                    binder.bind(MaterializerRegistryRepository.class)
-                            .toInstance(new MaterializerRegistryRepository("owner/registry"));
+                    binder.bind(String.class).annotatedWith(Names.named("materializationServiceRepository"))
+                            .toInstance("owner/service");
+                    binder.bind(String.class).annotatedWith(Names.named("materializationDispatchClientID"))
+                            .toInstance("client-id");
+                    binder.bind(String.class).annotatedWith(Names.named("materializationDispatchPrivateKey"))
+                            .toInstance("private-key");
+                    binder.bind(String.class).annotatedWith(Names.named("materializationPublishClientID"))
+                            .toInstance("client-id");
+                    binder.bind(String.class).annotatedWith(Names.named("materializationPublishPrivateKey"))
+                            .toInstance("private-key");
+                    binder.bind(String.class).annotatedWith(Names.named("githubToken")).toInstance("token");
+                    binder.bind(String.class).annotatedWith(Names.named("materializerRegistryRepository"))
+                            .toInstance("owner/registry");
+                    binder.bind(String.class).annotatedWith(Names.named("pipelineInputsRepository"))
+                            .toInstance("owner/inputs");
                     binder.bind(GitHub.class).toInstance(mock(GitHub.class));
+                    binder.bind(HttpClient.class).toInstance(mock(HttpClient.class));
                 })
         );
 
         assertNotNull(injector.getInstance(RegisterExecutor.class));
-        assertNull(injector.getExistingBinding(Key.get(MaterializeNewPushesExecutor.class)));
-        assertNull(injector.getExistingBinding(Key.get(HttpClient.class)));
-        assertNotNull(injector.getInstance(GitHubToken.class));
-        assertNull(injector.getExistingBinding(Key.get(PublisherConfigurator.class)));
+        assertNull(injector.getExistingBinding(Key.get(MaterializeSoftwareExecutor.class)));
+        assertNotNull(injector.getInstance(HttpClient.class));
+        assertNotNull(injector.getInstance(Key.get(String.class, Names.named("githubToken"))));
+        assertNotNull(injector.getInstance(GitHubCredentialStore.class));
     }
 
     @Test
@@ -57,24 +67,30 @@ class ApplicationCompositionTest {
                 Stage.PRODUCTION,
                 Modules.override(
                         new StrictGuiceModule(),
-                        new GitHubTokenModule(),
-                        new MaterializerRegistryRepositoryModule(),
-                        new PipelineInputsRepositoryModule(),
+                        new MaterializationEnvironmentModule(),
                         new GitHubClientsModule(),
                         new HttpClientModule()
                 ).with(binder -> {
-                    binder.bind(GitHubToken.class).toInstance(new GitHubToken("token"));
-                    binder.bind(MaterializerRegistryRepository.class)
-                            .toInstance(new MaterializerRegistryRepository("owner/registry"));
-                    binder.bind(PipelineInputsRepository.class)
-                            .toInstance(new PipelineInputsRepository("owner/inputs"));
-                    binder.bind(GitHub.class).toInstance(mock(GitHub.class));
+                    binder.bind(String.class).annotatedWith(Names.named("githubToken")).toInstance("token");
+                    binder.bind(String.class).annotatedWith(Names.named("materializerRegistryRepository"))
+                            .toInstance("owner/registry");
+                    binder.bind(String.class).annotatedWith(Names.named("pipelineInputsRepository"))
+                            .toInstance("owner/inputs");
+                    binder.bind(String.class).annotatedWith(Names.named("materializationServiceRepository"))
+                            .toInstance("owner/service");
+                    binder.bind(String.class).annotatedWith(Names.named("materializationDispatchClientID"))
+                            .toInstance("client-id");
+                    binder.bind(String.class).annotatedWith(Names.named("materializationDispatchPrivateKey"))
+                            .toInstance("private-key");
                     binder.bind(HttpClient.class).toInstance(mock(HttpClient.class));
+                    binder.bind(GitHub.class).toInstance(mock(GitHub.class));
                 })
         );
 
-        assertNotNull(injector.getInstance(MaterializeNewPushesExecutor.class));
+        assertNotNull(injector.getInstance(MaterializeSoftwareExecutor.class));
         assertNull(injector.getExistingBinding(Key.get(RegisterExecutor.class)));
-        assertNull(injector.getExistingBinding(Key.get(PublisherConfigurator.class)));
+        Key<String> dispatcherKey = Key.get(String.class, Names.named("materializationDispatchPrivateKey"));
+        assertNotNull(injector.getExistingBinding(dispatcherKey));
+        assertNotNull(injector.getExistingBinding(Key.get(GitHubCredentialStore.class)));
     }
 }

@@ -1,5 +1,7 @@
 package io.materializer.livepipelineinputsreconciler;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -9,30 +11,27 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.materializer.shared.livepipelinedeclarationfetcher.LivePipelineDeclarationFetcher;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineInput;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.LivePipelineDeclaration;
-import io.materializer.shared.livepipelineinputsstore.LivePipelineInputsStore;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
 import io.materializer.shared.models.RepositorySnapshot;
-import io.materializer.shared.repositorypushhistory.RepositoryPushHistory;
 import io.materializer.shared.utilities.HibernateValidatorUtility;
+import org.kohsuke.github.GitHub;
 
 public class LivePipelineInputsReconciler {
 
     private final LivePipelineDeclarationFetcher livePipelineDeclarationFetcher;
 
-    private final RepositoryPushHistory repositoryPushHistory;
+    private final GitHub gitHub;
 
-    private final LivePipelineInputsStore livePipelineInputsStore;
 
-    @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Guice manages the shared inputs store")
+
+    @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Guice manages the injected dependencies")
     @Inject
     public LivePipelineInputsReconciler(
             LivePipelineDeclarationFetcher livePipelineDeclarationFetcher,
-            RepositoryPushHistory repositoryPushHistory,
-            LivePipelineInputsStore livePipelineInputsStore
+            GitHub gitHub
     ) {
         this.livePipelineDeclarationFetcher = livePipelineDeclarationFetcher;
-        this.repositoryPushHistory = repositoryPushHistory;
-        this.livePipelineInputsStore = livePipelineInputsStore;
+        this.gitHub = gitHub;
     }
 
     public LivePipelineInputs reconcile(LivePipelineInputs inputs) {
@@ -46,7 +45,6 @@ public class LivePipelineInputsReconciler {
 
         LivePipelineInputs reconciledInputs = new LivePipelineInputs(materializerSnapshot, declaredRepositorySnapshots);
         HibernateValidatorUtility.validate(reconciledInputs);
-        livePipelineInputsStore.write(reconciledInputs);
         return reconciledInputs;
     }
 
@@ -69,7 +67,17 @@ public class LivePipelineInputsReconciler {
         Optional<RepositorySnapshot> previousSnapshot = findPreviousSnapshot(declaredInput, previousSnapshots);
         if (previousSnapshot.isPresent()) { return previousSnapshot.get(); }
 
-        return repositoryPushHistory.latest(declaredInput.repositoryName(), declaredInput.branch());
+        return fetchLatestSnapshot(declaredInput.repositoryName(), declaredInput.branch());
+    }
+
+    private RepositorySnapshot fetchLatestSnapshot(String repositoryName, String branch) {
+        try {
+            String commitSHA = gitHub.getRepository(repositoryName).getBranch(branch).getSHA1();
+            return new RepositorySnapshot(repositoryName, branch, commitSHA);
+
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Could not read branch " + branch + " in " + repositoryName, exception);
+        }
     }
 
     private Optional<RepositorySnapshot> findPreviousSnapshot(

@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Optional;
 
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
-import io.materializer.shared.livepipelineinputsstore.models.PipelineInputsRepository;
 import io.materializer.shared.models.RepositorySnapshot;
 import io.materializer.shared.utilities.JsonMapperUtility;
 import org.junit.jupiter.api.Test;
@@ -40,7 +39,7 @@ class LivePipelineInputsStoreTest {
     private final GHTree tree = mock(GHTree.class);
     private final LivePipelineInputsStore livePipelineInputsStore = new LivePipelineInputsStore(
             gitHub,
-            new PipelineInputsRepository("owner/service")
+            "owner/service"
     );
 
     @Test
@@ -50,7 +49,7 @@ class LivePipelineInputsStoreTest {
 
         assertThrows(UncheckedIOException.class, () -> livePipelineInputsStore.read("owner/materializer"));
         LivePipelineInputs inputs = new LivePipelineInputs(
-                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40), 1L),
+                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40)),
                 List.of()
         );
         assertThrows(UncheckedIOException.class, () -> livePipelineInputsStore.write(inputs));
@@ -68,7 +67,7 @@ class LivePipelineInputsStoreTest {
     void readsInputsAtTheBranchCommitUsingACaseInsensitivePath() throws IOException {
         prepareBranch();
         LivePipelineInputs inputs = new LivePipelineInputs(
-                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40), 1L),
+                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40)),
                 List.of()
         );
         prepareFile(JsonMapperUtility.MAPPER.writeValueAsString(inputs));
@@ -88,7 +87,7 @@ class LivePipelineInputsStoreTest {
     void rejectsInputsForAnotherMaterializer() throws IOException {
         prepareBranch();
         LivePipelineInputs inputs = new LivePipelineInputs(
-                new RepositorySnapshot("owner/other", "main", "a".repeat(40), 1L),
+                new RepositorySnapshot("owner/other", "main", "a".repeat(40)),
                 List.of()
         );
         prepareFile(JsonMapperUtility.MAPPER.writeValueAsString(inputs));
@@ -121,7 +120,7 @@ class LivePipelineInputsStoreTest {
         GHRef ref = mock(GHRef.class);
         when(repository.getRef("heads/main")).thenReturn(ref);
         LivePipelineInputs inputs = new LivePipelineInputs(
-                new RepositorySnapshot("Owner/Materializer", "main", "a".repeat(40), 1L),
+                new RepositorySnapshot("Owner/Materializer", "main", "a".repeat(40)),
                 List.of()
         );
 
@@ -144,7 +143,7 @@ class LivePipelineInputsStoreTest {
         when(repository.getRef("heads/main")).thenReturn(ref);
         doThrow(new IOException("Non-fast-forward update")).when(ref).updateTo("new-commit", false);
         LivePipelineInputs inputs = new LivePipelineInputs(
-                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40), 1L),
+                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40)),
                 List.of()
         );
 
