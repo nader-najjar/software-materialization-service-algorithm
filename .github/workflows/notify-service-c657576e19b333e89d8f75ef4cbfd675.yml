@@ -1,0 +1,28 @@
+name: "Notify Service"
+env:
+  SERVICE_OWNER: "nader-najjar"
+  SERVICE_REPOSITORY: "software-materialization-service"
+  PIPELINE_REPOSITORY: "nader-najjar/software-materialization-service-materializer"
+  SERVICE_REF: "main"
+"on":
+  push:
+    branches:
+    - "main"
+permissions: {}
+jobs:
+  notify-service:
+    runs-on: "ubuntu-24.04-arm"
+    steps:
+    - name: "Create Dispatch Token"
+      id: "dispatch-token"
+      uses: "actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510"
+      with:
+        client-id: "${{ vars.DISPATCH_CLIENT_ID_c657576e19b333e89d8f75ef4cbfd675 }}"
+        private-key: "${{ secrets.DISPATCH_PRIVATE_KEY_c657576e19b333e89d8f75ef4cbfd675 }}"
+        owner: "${{ env.SERVICE_OWNER }}"
+        repositories: "${{ env.SERVICE_REPOSITORY }}"
+        permission-actions: "write"
+    - name: "Notify Service"
+      env:
+        GH_TOKEN: "${{ steps.dispatch-token.outputs.token }}"
+      run: "gh workflow run materialize-software.yml --repo \"$SERVICE_OWNER/$SERVICE_REPOSITORY\" --ref \"$SERVICE_REF\" --raw-field \"pipelineRepository=$PIPELINE_REPOSITORY\" --field \"pushEvent=@$GITHUB_EVENT_PATH\""
