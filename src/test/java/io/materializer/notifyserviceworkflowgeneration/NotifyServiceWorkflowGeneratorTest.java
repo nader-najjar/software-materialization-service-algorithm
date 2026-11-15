@@ -21,7 +21,7 @@ class NotifyServiceWorkflowGeneratorTest {
         assertTrue(workflow.required("permissions").isEmpty());
         JsonNode steps = workflow.at("/jobs/notify-service/steps");
         assertEquals("${{ secrets.MATERIALIZATION_DISPATCH_PRIVATE_KEY }}", steps.at("/0/with/private-key").asText());
-        assertEquals("gh workflow run wake-materialization.yml --repo \"$SERVICE_OWNER/$SERVICE_REPOSITORY\""
+        assertEquals("gh workflow run materialize-all-software.yml --repo \"$SERVICE_OWNER/$SERVICE_REPOSITORY\""
                 + " --ref \"$SERVICE_REF\"", steps.at("/1/run").asText());
     }
 }

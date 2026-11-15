@@ -33,4 +33,4 @@ jobs:
       - name: Notify Service
         env:
           GH_TOKEN: ${{ steps.dispatch-token.outputs.token }}
-        run: gh workflow run wake-materialization.yml --repo "$SERVICE_OWNER/$SERVICE_REPOSITORY" --ref "$SERVICE_REF"
+        run: gh workflow run materialize-all-software.yml --repo "$SERVICE_OWNER/$SERVICE_REPOSITORY" --ref "$SERVICE_REF"
