@@ -7,7 +7,7 @@ module.exports = async function publish({github}) {
   const release = await getOrCreateRelease(github, repository, tag);
   await uploadAsset(github, repository, release);
   if (release.draft) {
-    await github.rest.repos.updateRelease({...repository, release_id: release.id, draft: false, make_latest: 'false'});
+    await github.rest.repos.updateRelease({...repository, release_id: release.id, draft: false, make_latest: 'true'});
   }
 };
 

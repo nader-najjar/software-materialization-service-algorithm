@@ -7,22 +7,28 @@ import io.materializer.notifyserviceworkflowpublishing.NotifyServiceWorkflowPubl
 import io.materializer.shared.githubcredentialstore.GitHubCredentialStore;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
 import io.materializer.shared.models.RepositorySnapshot;
+import io.materializer.shared.repositorypushhistory.RepositoryPushHistory;
+import io.materializer.shared.repositorypushhistory.models.RepositoryPush;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 class SourceNotificationReconcilerTest {
 
+    private final RepositoryPushHistory history = mock(RepositoryPushHistory.class);
     private final GitHubCredentialStore gitHubCredentialStore = mock(GitHubCredentialStore.class);
     private final NotifyServiceWorkflowPublisher notifyServiceWorkflowPublisher =
             mock(NotifyServiceWorkflowPublisher.class);
     private final SourceNotificationReconciler sourceNotificationReconciler = new SourceNotificationReconciler(
+            history,
             gitHubCredentialStore,
             new NotifyServiceWorkflowGenerator("owner/service"),
             notifyServiceWorkflowPublisher,
@@ -33,7 +39,15 @@ class SourceNotificationReconcilerTest {
     @Test
     void installsCredentialsAndNotificationBeforePublishingWorkflow() {
         RepositorySnapshot source = new RepositorySnapshot("owner/new", "main", "b".repeat(40), 1L);
-        sourceNotificationReconciler.reconcile(inputs(), inputs(source));
+        String notificationSHA = "c".repeat(40);
+        when(notifyServiceWorkflowPublisher.publish(eq("owner/new"), eq("main"), anyString(), anyString()))
+                .thenReturn(notificationSHA);
+        when(history.since(source)).thenReturn(List.of(
+                new RepositoryPush(2L, source.commitSHA(), notificationSHA, "2026-11-15T00:00:00Z"),
+                new RepositoryPush(3L, notificationSHA, "d".repeat(40), "2026-11-15T00:00:01Z")
+        ));
+        LivePipelineInputs reconciled = sourceNotificationReconciler.reconcile(inputs(), inputs(source));
+        assertEquals(inputs(new RepositorySnapshot("owner/new", "main", notificationSHA, 2L)), reconciled);
 
         InOrder order = inOrder(gitHubCredentialStore, notifyServiceWorkflowPublisher);
         order.verify(gitHubCredentialStore).setVariable(eq("owner/new"), anyString(), eq("dispatch-client"));
@@ -44,6 +58,14 @@ class SourceNotificationReconcilerTest {
                 anyString(),
                 anyString()
         );
+    }
+
+    @Test
+    void keepsTheKnownPinWhenTheNotificationPushIsNotVisibleYet() {
+        RepositorySnapshot source = new RepositorySnapshot("owner/new", "main", "b".repeat(40), 1L);
+        when(notifyServiceWorkflowPublisher.publish(eq("owner/new"), eq("main"), anyString(), anyString()))
+                .thenReturn("c".repeat(40));
+        assertEquals(inputs(source), sourceNotificationReconciler.reconcile(inputs(), inputs(source)));
     }
 
     @Test

@@ -58,9 +58,10 @@ class MaterializeAllSoftwareExecutorTest {
     void advancesPastAnInvalidDeclarationOnTheNextWake() {
         MaterializerRegistration registration = new MaterializerRegistration("owner/pipeline", List.of());
         RepositoryPushHistory history = mock(RepositoryPushHistory.class);
+        SourceNotificationReconciler notifications = mock(SourceNotificationReconciler.class);
         MaterializeAllSoftwareExecutor executor = new MaterializeAllSoftwareExecutor(
                 new LivePipelineInputsAdvancer(history, store), reconciler,
-                mock(SourceNotificationReconciler.class), store, mock(PipelineWorkflowGenerator.class),
+                notifications, store, mock(PipelineWorkflowGenerator.class),
                 publisher, materializerRegistryStore);
         RepositorySnapshot initial = new RepositorySnapshot(registration.repositoryName(), "main", "a".repeat(40), 1L);
         RepositorySnapshot broken = new RepositorySnapshot(registration.repositoryName(), "main", "b".repeat(40), 2L);
@@ -82,6 +83,8 @@ class MaterializeAllSoftwareExecutorTest {
         when(history.since(broken)).thenReturn(List.of(fixPush));
         when(reconciler.reconcile(registration, brokenInputs)).thenThrow(new IllegalArgumentException("Invalid JSON"));
         when(reconciler.reconcile(registration, fixedInputs)).thenReturn(fixedInputs);
+
+        when(notifications.reconcile(fixedInputs, fixedInputs)).thenReturn(fixedInputs);
 
         executor.execute();
         org.junit.jupiter.api.Assertions.assertEquals(brokenInputs, saved.get());

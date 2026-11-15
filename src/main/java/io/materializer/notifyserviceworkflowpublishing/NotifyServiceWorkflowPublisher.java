@@ -21,14 +21,14 @@ public class NotifyServiceWorkflowPublisher {
         this.gitHub = gitHub;
     }
 
-    public void publish(String repositoryName, String branch, String path, String workflowYaml) {
+    public String publish(String repositoryName, String branch, String path, String workflowYaml) {
         try {
             GHRepository repository = gitHub.getRepository(repositoryName);
             GHContent existing = findContent(repository, branch, path);
             GHContentBuilder builder = repository.createContent().path(path).branch(branch)
                     .content(workflowYaml).message("Update service notification workflow");
             if (existing != null) { builder.sha(existing.getSha()); }
-            builder.commit();
+            return builder.commit().getCommit().getSHA1();
 
         } catch (IOException exception) {
             throw new UncheckedIOException("Could not update notify service workflow: " + repositoryName, exception);

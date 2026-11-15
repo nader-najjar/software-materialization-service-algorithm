@@ -6,10 +6,12 @@ import java.io.UncheckedIOException;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHContentBuilder;
+import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Answers.RETURNS_SELF;
 import static org.mockito.Mockito.mock;
@@ -29,7 +31,10 @@ class NotifyServiceWorkflowPublisherTest {
         when(gitHub.getRepository("owner/pipeline")).thenReturn(repository);
         when(repository.createContent()).thenReturn(contentBuilder);
 
-        publisher.publish("owner/pipeline", "development", ".github/workflows/notify-service.yml", "workflow");
+        stubNotificationCommit();
+        String sha = publisher.publish("owner/pipeline", "development", ".github/workflows/notify-service.yml",
+                "workflow");
+        assertEquals("notification-sha", sha);
 
         verify(contentBuilder).path(".github/workflows/notify-service.yml");
         verify(contentBuilder).branch("development");
@@ -57,6 +62,7 @@ class NotifyServiceWorkflowPublisherTest {
         when(content.getSha()).thenReturn("existing-sha");
         when(repository.createContent()).thenReturn(contentBuilder);
 
+        stubNotificationCommit();
         publisher.publish("owner/source", "main", "notification.yml", "workflow");
 
         verify(content, never()).read();
@@ -71,6 +77,7 @@ class NotifyServiceWorkflowPublisherTest {
         when(repository.getFileContent("notification.yml", "main")).thenThrow(new GHFileNotFoundException());
         when(repository.createContent()).thenReturn(contentBuilder);
 
+        stubNotificationCommit();
         publisher.publish("owner/source", "main", "notification.yml", "workflow");
 
         verify(contentBuilder).path("notification.yml");
@@ -89,4 +96,9 @@ class NotifyServiceWorkflowPublisherTest {
         verify(content).delete("Remove service notification workflow", "release");
     }
 
+    private void stubNotificationCommit() throws IOException {
+        GHContentUpdateResponse response = mock(GHContentUpdateResponse.class, org.mockito.Answers.RETURNS_DEEP_STUBS);
+        when(contentBuilder.commit()).thenReturn(response);
+        when(response.getCommit().getSHA1()).thenReturn("notification-sha");
+    }
 }
