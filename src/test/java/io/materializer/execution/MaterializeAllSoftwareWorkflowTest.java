@@ -120,6 +120,7 @@ class MaterializeAllSoftwareWorkflowTest {
     private void preparePublication() throws IOException {
         when(materializerRegistryStore.read()).thenReturn(new MaterializerRegistry(List.of(registration)));
         when(advancer.advance(registration.repositoryName())).thenReturn(Optional.of(reconciledInputs));
+        when(sourceNotificationReconciler.reconcile(reconciledInputs, reconciledInputs)).thenReturn(reconciledInputs);
         when(livePipelineInputsReconciler.reconcile(registration, reconciledInputs)).thenReturn(reconciledInputs);
         DeclaredPipelineInput input = new DeclaredPipelineInput(
                 "owner/source",

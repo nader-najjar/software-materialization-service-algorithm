@@ -66,7 +66,7 @@ public class MaterializeAllSoftwareExecutor {
             return;
         }
         LivePipelineInputs current = livePipelineInputsReconciler.reconcile(registration, advanced.get());
-        sourceNotificationReconciler.reconcile(advanced.get(), current);
+        current = sourceNotificationReconciler.reconcile(advanced.get(), current);
         livePipelineInputsStore.write(current);
         if (current.declaredRepositorySnapshots().isEmpty()) {
             LOGGER.info("Pipeline {} is idle", repositoryName);
