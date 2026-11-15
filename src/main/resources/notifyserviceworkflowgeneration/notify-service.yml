@@ -3,12 +3,16 @@ name: Notify Service
 env:
   SERVICE_OWNER: ""
   SERVICE_REPOSITORY: ""
-  PIPELINE_REPOSITORY: ""
   SERVICE_REF: main
 
 on:
   push:
     branches: []
+
+concurrency:
+  group: notify-service
+  queue: max
+  cancel-in-progress: false
 
 permissions: {}
 
@@ -29,4 +33,4 @@ jobs:
       - name: Notify Service
         env:
           GH_TOKEN: ${{ steps.dispatch-token.outputs.token }}
-        run: gh workflow run materialize-software.yml --repo "$SERVICE_OWNER/$SERVICE_REPOSITORY" --ref "$SERVICE_REF" --raw-field "pipelineRepository=$PIPELINE_REPOSITORY" --field "pushEvent=@$GITHUB_EVENT_PATH"
+        run: gh workflow run materialize-all-software.yml --repo "$SERVICE_OWNER/$SERVICE_REPOSITORY" --ref "$SERVICE_REF"

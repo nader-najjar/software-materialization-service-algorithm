@@ -8,6 +8,7 @@ import io.materializer.shared.githubcredentialstore.GitHubCredentialStore;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
 import io.materializer.shared.models.RepositorySnapshot;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -31,10 +32,10 @@ class SourceNotificationReconcilerTest {
 
     @Test
     void installsCredentialsAndNotificationBeforePublishingWorkflow() {
-        RepositorySnapshot source = new RepositorySnapshot("owner/new", "main", "b".repeat(40));
+        RepositorySnapshot source = new RepositorySnapshot("owner/new", "main", "b".repeat(40), 1L);
         sourceNotificationReconciler.reconcile(inputs(), inputs(source));
 
-        var order = inOrder(gitHubCredentialStore, notifyServiceWorkflowPublisher);
+        InOrder order = inOrder(gitHubCredentialStore, notifyServiceWorkflowPublisher);
         order.verify(gitHubCredentialStore).setVariable(eq("owner/new"), anyString(), eq("dispatch-client"));
         order.verify(gitHubCredentialStore).setSecret(eq("owner/new"), anyString(), eq("dispatch-key"));
         order.verify(notifyServiceWorkflowPublisher).publish(
@@ -47,7 +48,7 @@ class SourceNotificationReconcilerTest {
 
     @Test
     void removesOnlyThisPipelinesNotificationAndCredentials() {
-        RepositorySnapshot source = new RepositorySnapshot("owner/source", "main", "b".repeat(40));
+        RepositorySnapshot source = new RepositorySnapshot("owner/source", "main", "b".repeat(40), 1L);
         sourceNotificationReconciler.reconcile(inputs(source), inputs());
 
         verify(notifyServiceWorkflowPublisher).remove(eq("owner/source"), eq("main"), anyString());
@@ -57,8 +58,8 @@ class SourceNotificationReconcilerTest {
 
     @Test
     void retainsCredentialsWhenAnotherBranchStillUsesTheSource() {
-        RepositorySnapshot main = new RepositorySnapshot("owner/source", "main", "b".repeat(40));
-        RepositorySnapshot release = new RepositorySnapshot("owner/source", "release", "c".repeat(40));
+        RepositorySnapshot main = new RepositorySnapshot("owner/source", "main", "b".repeat(40), 1L);
+        RepositorySnapshot release = new RepositorySnapshot("owner/source", "release", "c".repeat(40), 1L);
         sourceNotificationReconciler.reconcile(inputs(main, release), inputs(release));
 
         verify(notifyServiceWorkflowPublisher).remove(eq("owner/source"), eq("main"), anyString());
@@ -67,7 +68,7 @@ class SourceNotificationReconcilerTest {
 
     private LivePipelineInputs inputs(RepositorySnapshot... sources) {
         return new LivePipelineInputs(
-                new RepositorySnapshot("owner/pipeline", "main", "a".repeat(40)),
+                new RepositorySnapshot("owner/pipeline", "main", "a".repeat(40), 1L),
                 List.of(sources)
         );
     }

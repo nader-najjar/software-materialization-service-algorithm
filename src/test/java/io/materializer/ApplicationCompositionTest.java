@@ -12,7 +12,7 @@ import io.materializer.composition.HttpClientModule;
 import io.materializer.composition.MaterializationEnvironmentModule;
 import io.materializer.composition.RegistrationEnvironmentModule;
 import io.materializer.composition.StrictGuiceModule;
-import io.materializer.execution.MaterializeSoftwareExecutor;
+import io.materializer.execution.MaterializeAllSoftwareExecutor;
 import io.materializer.execution.RegisterExecutor;
 import io.materializer.shared.githubcredentialstore.GitHubCredentialStore;
 import org.junit.jupiter.api.Test;
@@ -40,10 +40,6 @@ class ApplicationCompositionTest {
                             .toInstance("client-id");
                     binder.bind(String.class).annotatedWith(Names.named("materializationDispatchPrivateKey"))
                             .toInstance("private-key");
-                    binder.bind(String.class).annotatedWith(Names.named("materializationPublishClientID"))
-                            .toInstance("client-id");
-                    binder.bind(String.class).annotatedWith(Names.named("materializationPublishPrivateKey"))
-                            .toInstance("private-key");
                     binder.bind(String.class).annotatedWith(Names.named("githubToken")).toInstance("token");
                     binder.bind(String.class).annotatedWith(Names.named("materializerRegistryRepository"))
                             .toInstance("owner/registry");
@@ -55,7 +51,7 @@ class ApplicationCompositionTest {
         );
 
         assertNotNull(injector.getInstance(RegisterExecutor.class));
-        assertNull(injector.getExistingBinding(Key.get(MaterializeSoftwareExecutor.class)));
+        assertNull(injector.getExistingBinding(Key.get(MaterializeAllSoftwareExecutor.class)));
         assertNotNull(injector.getInstance(HttpClient.class));
         assertNotNull(injector.getInstance(Key.get(String.class, Names.named("githubToken"))));
         assertNotNull(injector.getInstance(GitHubCredentialStore.class));
@@ -87,7 +83,7 @@ class ApplicationCompositionTest {
                 })
         );
 
-        assertNotNull(injector.getInstance(MaterializeSoftwareExecutor.class));
+        assertNotNull(injector.getInstance(MaterializeAllSoftwareExecutor.class));
         assertNull(injector.getExistingBinding(Key.get(RegisterExecutor.class)));
         Key<String> dispatcherKey = Key.get(String.class, Names.named("materializationDispatchPrivateKey"));
         assertNotNull(injector.getExistingBinding(dispatcherKey));

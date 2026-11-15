@@ -16,6 +16,9 @@ permissions:
 
 jobs:
   build:
+    env:
+      CLIENT_ID_VARIABLE: APP_ID
+      PRIVATE_KEY_SECRET: APP_KEY
     name: Build ${{ matrix.repositoryName }} (${{ matrix.platform }})
     strategy:
       fail-fast: false
@@ -64,8 +67,8 @@ jobs:
         id: create-repository-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: ${{ vars.MATERIALIZATION_PUBLISH_CLIENT_ID }}
-          private-key: ${{ secrets.MATERIALIZATION_PUBLISH_PRIVATE_KEY }}
+          client-id: ${{ vars[env.CLIENT_ID_VARIABLE] }}
+          private-key: ${{ secrets[env.PRIVATE_KEY_SECRET] }}
           owner: ${{ env.REPOSITORY_OWNER }}
           repositories: ${{ matrix.repositoryName }}
           permission-contents: write

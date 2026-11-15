@@ -9,9 +9,11 @@ import io.materializer.composition.GitHubClientsModule;
 import io.materializer.composition.HttpClientModule;
 import io.materializer.composition.MaterializationEnvironmentModule;
 import io.materializer.composition.RegistrationEnvironmentModule;
+import io.materializer.composition.SourceRegistrationEnvironmentModule;
 import io.materializer.composition.StrictGuiceModule;
-import io.materializer.execution.MaterializeSoftwareExecutor;
+import io.materializer.execution.MaterializeAllSoftwareExecutor;
 import io.materializer.execution.RegisterExecutor;
+import io.materializer.execution.RegisterSourceExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,20 +51,24 @@ public final class Main {
     }
 
     static void route(String[] args) {
-        if (args == null || args.length != 2) {
-            throw new IllegalArgumentException("Expected an operation and a JSON input argument");
+        if (args == null || args.length == 0) {
+            throw new IllegalArgumentException("Expected an operation");
         }
         if (args[0] == null) {
             throw new IllegalArgumentException("Operation must not be null");
         }
         switch (args[0]) {
-            case "register" -> register(args[1]);
-            case "materialize-software" -> materializeSoftware(args[1]);
+            case "register" -> register(args);
+            case "register-source" -> registerSource(args);
+            case "materialize-all-software" -> materializeAllSoftware(args);
             default -> throw new IllegalArgumentException("Unsupported operation: " + args[0]);
         }
     }
 
-    private static void register(String json) {
+    private static void register(String[] args) {
+        if (args.length != 2) {
+            throw new IllegalArgumentException("Register requires a JSON input");
+        }
         Injector injector = Guice.createInjector(
                 Stage.PRODUCTION,
                 new StrictGuiceModule(),
@@ -71,10 +77,27 @@ public final class Main {
                 new HttpClientModule()
         );
         RegisterExecutor registerExecutor = injector.getInstance(RegisterExecutor.class);
-        registerExecutor.execute(json);
+        registerExecutor.execute(args[1]);
     }
 
-    private static void materializeSoftware(String json) {
+    private static void registerSource(String[] args) {
+        if (args.length != 2) {
+            throw new IllegalArgumentException("Register Source requires a JSON input");
+        }
+        Injector injector = Guice.createInjector(
+                Stage.PRODUCTION,
+                new StrictGuiceModule(),
+                new SourceRegistrationEnvironmentModule(),
+                new GitHubClientsModule()
+        );
+        RegisterSourceExecutor registerSourceExecutor = injector.getInstance(RegisterSourceExecutor.class);
+        registerSourceExecutor.execute(args[1]);
+    }
+
+    private static void materializeAllSoftware(String[] args) {
+        if (args.length != 1) {
+            throw new IllegalArgumentException("Materialize All Software takes no inputs");
+        }
         Injector injector = Guice.createInjector(
                 Stage.PRODUCTION,
                 new StrictGuiceModule(),
@@ -82,10 +105,10 @@ public final class Main {
                 new GitHubClientsModule(),
                 new HttpClientModule()
         );
-        MaterializeSoftwareExecutor materializeSoftwareExecutor = injector.getInstance(
-            MaterializeSoftwareExecutor.class
+        MaterializeAllSoftwareExecutor materializeAllSoftwareExecutor = injector.getInstance(
+            MaterializeAllSoftwareExecutor.class
         );
-        materializeSoftwareExecutor.execute(json);
+        materializeAllSoftwareExecutor.execute();
     }
 
     private static void logFailure(Exception exception) {

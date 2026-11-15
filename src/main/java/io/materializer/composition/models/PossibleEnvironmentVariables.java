@@ -23,13 +23,7 @@ public record PossibleEnvironmentVariables(
         String materializationDispatchClientID,
 
         @NotBlank
-        String materializationDispatchPrivateKey,
-
-        @NotBlank
-        String materializationPublishClientID,
-
-        @NotBlank
-        String materializationPublishPrivateKey
+        String materializationDispatchPrivateKey
 ) {
     @Override
     public String toString() {

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.materializer.shared.models.RepositorySnapshot;
 import io.materializer.shared.utilities.HibernateValidatorUtility;
 import io.materializer.shared.utilities.JsonMapperUtility;
@@ -18,9 +19,10 @@ class LivePipelineInputsTest {
     private final RepositorySnapshot materializer = new RepositorySnapshot(
             "owner/materializer",
             "main",
-            "a".repeat(40)
+            "a".repeat(40),
+            1L
     );
-    private final RepositorySnapshot source = new RepositorySnapshot("owner/source", "release", "c".repeat(40));
+    private final RepositorySnapshot source = new RepositorySnapshot("owner/source", "release", "c".repeat(40), 1L);
 
     @Test
     void preservesAllRepositorySnapshotsThroughJSONRoundTrip() throws IOException {
@@ -29,7 +31,7 @@ class LivePipelineInputsTest {
         LivePipelineInputs restored = JsonMapperUtility.MAPPER.readValue(json, LivePipelineInputs.class);
         HibernateValidatorUtility.validate(restored);
 
-        var tree = JsonMapperUtility.MAPPER.readTree(json);
+        JsonNode tree = JsonMapperUtility.MAPPER.readTree(json);
         assertEquals(materializer.repositoryName(), tree.at("/materializerRepositorySnapshot/repositoryName").asText());
         assertEquals(source.repositoryName(), tree.at("/declaredRepositorySnapshots/0/repositoryName").asText());
         assertEquals(original, restored);
@@ -63,7 +65,7 @@ class LivePipelineInputsTest {
 
     @Test
     void rejectsInvalidNestedRepositorySnapshots() {
-        RepositorySnapshot invalid = new RepositorySnapshot("missing-owner", "main", "main");
+        RepositorySnapshot invalid = new RepositorySnapshot("missing-owner", "main", "main", 1L);
         LivePipelineInputs snapshot = new LivePipelineInputs(materializer, List.of(invalid));
 
         assertThrows(ValidationException.class, () -> HibernateValidatorUtility.validate(snapshot));

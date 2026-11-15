@@ -23,7 +23,7 @@ class PipelineWorkflowGeneratorTest {
     void generatesTheExpectedWorkflowYaml() throws JsonProcessingException {
         LivePipelineDeclarationFetcher fetcher = mock(LivePipelineDeclarationFetcher.class);
         PipelineWorkflowGenerator generator = new PipelineWorkflowGenerator(fetcher, new BuildMatrixGenerator());
-        RepositorySnapshot materializer = new RepositorySnapshot("owner/mat", "main", "a".repeat(40));
+        RepositorySnapshot materializer = new RepositorySnapshot("owner/mat", "main", "a".repeat(40), 1L);
         List<String> platforms = List.of("aarch64-linux", "x86_64-linux");
         List<DeclaredPipelineInput> repositories = List.of(
                 new DeclaredPipelineInput("nader-najjar/pure-java", "main", "universal", platforms),
@@ -32,10 +32,10 @@ class PipelineWorkflowGeneratorTest {
         String javaSHA = "28e79fd674af4ba6387765247272fed25578430d";
         String javascriptSHA = "e90d63d9b81312d83738bb1654442d54ad40e36e";
         List<RepositorySnapshot> sources = List.of(
-                new RepositorySnapshot("nader-najjar/pure-java", "main", javaSHA),
-                new RepositorySnapshot("nader-najjar/pure-javascript", "main", javascriptSHA)
+                new RepositorySnapshot("nader-najjar/pure-java", "main", javaSHA, 1L),
+                new RepositorySnapshot("nader-najjar/pure-javascript", "main", javascriptSHA, 1L)
         );
-        DeclaredPipelineStep step = new DeclaredPipelineStep("Build", "build");
+        DeclaredPipelineStep step = new DeclaredPipelineStep("Build", "build", "APP_ID", "APP_KEY");
         LivePipelineDeclaration declaration = new LivePipelineDeclaration(repositories, List.of(step));
         when(fetcher.fetchAndValidate(materializer)).thenReturn(declaration);
 
@@ -43,5 +43,4 @@ class PipelineWorkflowGeneratorTest {
         String expected = ResourceUtility.readString("/pipelineworkflowgeneration/materialize.yml");
         assertEquals(YamlMapperUtility.MAPPER.readTree(expected), YamlMapperUtility.MAPPER.readTree(yaml));
     }
-
 }

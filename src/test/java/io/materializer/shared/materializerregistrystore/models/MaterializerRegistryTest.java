@@ -12,7 +12,7 @@ class MaterializerRegistryTest {
 
     @Test
     void freezesRegistryEntriesAgainstCallerMutation() {
-        MaterializerRegistration registration = new MaterializerRegistration("owner/pipeline");
+        MaterializerRegistration registration = new MaterializerRegistration("owner/pipeline", List.of());
         List<MaterializerRegistration> registrations = new ArrayList<>(List.of(registration));
         MaterializerRegistry registry = new MaterializerRegistry(registrations);
         registrations.clear();

@@ -49,9 +49,8 @@
             text = ''
               idiomatic_artifacts_dir="$1"
               operation="$2"
-              input_json="$3"
               # Guice uses an unsafe JDK operation, this flag removes the warning
-              exec java -Dguice_custom_class_loading=CHILD -XX:MaxRAMPercentage=75.0 -cp "$idiomatic_artifacts_dir/*" io.materializer.Main "$operation" "$input_json"
+              exec java -Dguice_custom_class_loading=CHILD -XX:MaxRAMPercentage=75.0 -cp "$idiomatic_artifacts_dir/*" io.materializer.Main "$operation" "''${@:3}"
             '';
           };
         }

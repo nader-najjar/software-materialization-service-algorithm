@@ -1,43 +1,41 @@
 package io.materializer.livepipelineinputsreconciler;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import com.google.inject.Inject;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.materializer.shared.livepipelinedeclarationfetcher.LivePipelineDeclarationFetcher;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineInput;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.LivePipelineDeclaration;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
+import io.materializer.shared.materializerregistrystore.models.MaterializerRegistration;
 import io.materializer.shared.models.RepositorySnapshot;
+import io.materializer.shared.repositorypushhistory.RepositoryPushHistory;
 import io.materializer.shared.utilities.HibernateValidatorUtility;
-import org.kohsuke.github.GitHub;
 
 public class LivePipelineInputsReconciler {
 
     private final LivePipelineDeclarationFetcher livePipelineDeclarationFetcher;
 
-    private final GitHub gitHub;
+    private final RepositoryPushHistory repositoryPushHistory;
 
-
-
-    @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Guice manages the injected dependencies")
     @Inject
     public LivePipelineInputsReconciler(
             LivePipelineDeclarationFetcher livePipelineDeclarationFetcher,
-            GitHub gitHub
+            RepositoryPushHistory repositoryPushHistory
     ) {
         this.livePipelineDeclarationFetcher = livePipelineDeclarationFetcher;
-        this.gitHub = gitHub;
+        this.repositoryPushHistory = repositoryPushHistory;
     }
 
-    public LivePipelineInputs reconcile(LivePipelineInputs inputs) {
+    public LivePipelineInputs reconcile(MaterializerRegistration registration, LivePipelineInputs inputs) {
         RepositorySnapshot materializerSnapshot = inputs.materializerRepositorySnapshot();
         LivePipelineDeclaration declaration = livePipelineDeclarationFetcher.fetchAndValidate(materializerSnapshot);
 
+        for (DeclaredPipelineInput source : declaration.repositories()) {
+            requireRegisteredSource(registration, source.repositoryName());
+        }
         List<RepositorySnapshot> declaredRepositorySnapshots = pinDeclaredRepositoriesReusingPreviousSnapshots(
                 declaration.repositories(),
                 inputs.declaredRepositorySnapshots()
@@ -46,6 +44,14 @@ public class LivePipelineInputsReconciler {
         LivePipelineInputs reconciledInputs = new LivePipelineInputs(materializerSnapshot, declaredRepositorySnapshots);
         HibernateValidatorUtility.validate(reconciledInputs);
         return reconciledInputs;
+    }
+
+    private void requireRegisteredSource(MaterializerRegistration registration, String sourceRepository) {
+        if (registration.sourceRepositories().stream().noneMatch(sourceRepository::equalsIgnoreCase)) {
+            throw new IllegalStateException(
+                    "Repository " + sourceRepository + " is not registered for " + registration.repositoryName()
+            );
+        }
     }
 
     private List<RepositorySnapshot> pinDeclaredRepositoriesReusingPreviousSnapshots(
@@ -67,17 +73,7 @@ public class LivePipelineInputsReconciler {
         Optional<RepositorySnapshot> previousSnapshot = findPreviousSnapshot(declaredInput, previousSnapshots);
         if (previousSnapshot.isPresent()) { return previousSnapshot.get(); }
 
-        return fetchLatestSnapshot(declaredInput.repositoryName(), declaredInput.branch());
-    }
-
-    private RepositorySnapshot fetchLatestSnapshot(String repositoryName, String branch) {
-        try {
-            String commitSHA = gitHub.getRepository(repositoryName).getBranch(branch).getSHA1();
-            return new RepositorySnapshot(repositoryName, branch, commitSHA);
-
-        } catch (IOException exception) {
-            throw new UncheckedIOException("Could not read branch " + branch + " in " + repositoryName, exception);
-        }
+        return repositoryPushHistory.latest(declaredInput.repositoryName(), declaredInput.branch());
     }
 
     private Optional<RepositorySnapshot> findPreviousSnapshot(

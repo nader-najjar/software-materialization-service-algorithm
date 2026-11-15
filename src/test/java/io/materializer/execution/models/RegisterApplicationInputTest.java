@@ -1,5 +1,4 @@
 package io.materializer.execution.models;
-import io.materializer.shared.utilities.JsonMapperUtility;
 import io.materializer.shared.utilities.JsonSanitizer;
 import jakarta.validation.ValidationException;
 import org.junit.jupiter.api.Test;
@@ -9,6 +8,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegisterApplicationInputTest {
 
@@ -20,7 +20,21 @@ class RegisterApplicationInputTest {
         );
 
         assertEquals("owner/materializer", input.repositoryName());
-        assertEquals(1, JsonMapperUtility.MAPPER.valueToTree(input).size());
+        assertEquals(java.util.List.of(), input.sourceRepositories());
+    }
+
+    @Test
+    void rejectsSourceRepositoriesThatDifferOnlyInCase() {
+        String json = """
+                {"repositoryName":"owner/materializer","sourceRepositories":["Owner/Repo","owner/repo"]}
+                """;
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> JsonSanitizer.parseAndValidate(json, RegisterApplicationInput.class)
+        );
+
+        assertInstanceOf(ValidationException.class, exception.getCause());
+        assertTrue(exception.getMessage().contains("sourceRepositories must contain unique repository names"));
     }
 
     @ParameterizedTest

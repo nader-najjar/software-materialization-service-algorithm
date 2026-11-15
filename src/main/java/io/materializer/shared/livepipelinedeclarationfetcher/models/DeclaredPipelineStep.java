@@ -2,6 +2,7 @@ package io.materializer.shared.livepipelinedeclarationfetcher.models;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
 public record DeclaredPipelineStep(
@@ -11,8 +12,18 @@ public record DeclaredPipelineStep(
         String name,
 
         @JsonProperty("operation")
-        @NotBlank
-        @Pattern(regexp = "build", message = "Supported operation: build")
-        String operation
+        @NotNull
+        @Pattern(regexp = "build")
+        String operation,
+
+        @JsonProperty("clientIdVariable")
+        @NotNull
+        @Pattern(regexp = "[A-Za-z_][A-Za-z0-9_]*")
+        String clientIdVariable,
+
+        @JsonProperty("privateKeySecret")
+        @NotNull
+        @Pattern(regexp = "[A-Za-z_][A-Za-z0-9_]*")
+        String privateKeySecret
 
 ) { }

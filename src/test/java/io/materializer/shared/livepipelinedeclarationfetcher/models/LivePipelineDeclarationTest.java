@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class LivePipelineDeclarationTest {
 
     private static final String PIPELINE_JSON = """
-            {"steps":[{"name":"build","operation":"build"}],
+            {"steps":[{"name":"build","clientIdVariable":"APP_ID","privateKeySecret":"APP_KEY","operation":"build"}],
              "repositories":[{"repositoryName":"owner/pure-java","branch":"main",
               "build_system":"universal","platforms":["aarch64-linux","x86_64-linux"]}]}
             """;
@@ -22,10 +22,16 @@ class LivePipelineDeclarationTest {
                 PIPELINE_JSON,
                 LivePipelineDeclaration.class
         );
-        assertEquals(new DeclaredPipelineStep("build", "build"), livePipelineDeclaration.steps().getFirst());
+        assertEquals(new DeclaredPipelineStep("build", "build", "APP_ID", "APP_KEY"),
+                livePipelineDeclaration.steps().getFirst());
         DeclaredPipelineInput repository = livePipelineDeclaration.repositories().getFirst();
         assertEquals("owner/pure-java", repository.repositoryName());
         assertEquals("universal", repository.buildSystem());
+    }
+
+    @Test
+    void acceptsEmptyPipeline() {
+        JsonSanitizer.parseAndValidate("{\"repositories\":[],\"steps\":[]}", LivePipelineDeclaration.class);
     }
 
     @ParameterizedTest
@@ -47,10 +53,10 @@ class LivePipelineDeclarationTest {
     @Test
     void requiresExactlyOneBuildStepAtTheStart() {
         String build = """
-                {"name":"Compile Libraries","operation":"build"}
+                {"name":"Compile","clientIdVariable":"APP_ID","privateKeySecret":"APP_KEY","operation":"build"}
                 """.strip();
-        String deploy = build.replace("build", "deploy").replace("Compile Libraries", "build");
-        String declaration = PIPELINE_JSON.replace("{\"name\":\"build\",\"operation\":\"build\"}", "%s");
+        String deploy = build.replace("build", "deploy").replace("Compile", "build");
+        String declaration = PIPELINE_JSON.replace(build.replace("Compile", "build"), "%s");
 
         assertInvalid(declaration.formatted(""));
         assertInvalid(declaration.formatted(deploy));
@@ -76,7 +82,8 @@ class LivePipelineDeclarationTest {
     @Test
     void requiresDistinctBranchesForRepeatedRepositories() {
         String entries = """
-                {"steps":[{"name":"build","operation":"build"}],
+                {"steps":[
+                  {"name":"build","clientIdVariable":"APP_ID","privateKeySecret":"APP_KEY","operation":"build"}],
                  "repositories":[
                   {"repositoryName":"owner/repo","branch":"main",
                    "build_system":"universal","platforms":["x86_64-linux"]},

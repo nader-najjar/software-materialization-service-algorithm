@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistration;
 import io.materializer.shared.materializerregistrystore.models.MaterializerRegistry;
@@ -43,7 +44,7 @@ class MaterializerRegistryStoreTest {
         InputStream stream = stubRegistry("{\"registrations\":[{\"repositoryName\":\"owner/pipeline\"}]}");
         MaterializerRegistry registry = materializerRegistryStore.read();
 
-        assertEquals(new MaterializerRegistration("owner/pipeline"), registry.registrations().getFirst());
+        assertEquals(new MaterializerRegistration("owner/pipeline", List.of()), registry.registrations().getFirst());
         verify(repository).getFileContent("materializer-registry.json");
 
         verify(stream).close();
@@ -98,7 +99,7 @@ class MaterializerRegistryStoreTest {
         GHContentBuilder writer = mock(GHContentBuilder.class, RETURNS_SELF);
         when(repository.createContent()).thenReturn(writer);
 
-        materializerRegistryStore.addRegistration(snapshot, "owner/new");
+        materializerRegistryStore.addRegistration(snapshot, new MaterializerRegistration("owner/new", List.of()));
 
         verify(repository).getFileContent("materializer-registry.json");
         verify(writer).sha("original-file-sha");
@@ -106,6 +107,42 @@ class MaterializerRegistryStoreTest {
         verify(writer).message("Register owner/new");
         verify(writer).commit();
         assertUpdatedRegistrations(writer);
+    }
+
+    @Test
+    void associatesASourceWithOnlyTheSelectedMaterializer() throws IOException {
+        stubRegistry("""
+                {"registrations":[{"repositoryName":"owner/one"},{"repositoryName":"owner/two"}]}
+                """);
+        when(content.getSha()).thenReturn("original");
+        GHContentBuilder writer = mock(GHContentBuilder.class, RETURNS_SELF);
+        when(repository.createContent()).thenReturn(writer);
+        materializerRegistryStore.registerSource("Owner/Two", "Owner/Source");
+
+        ArgumentCaptor<byte[]> updated = ArgumentCaptor.forClass(byte[].class);
+        verify(writer).content(updated.capture());
+        verify(writer).sha("original");
+        verify(writer).commit();
+        MaterializerRegistry registry = JsonMapperUtility.MAPPER.readValue(
+                updated.getValue(), MaterializerRegistry.class
+        );
+        List<MaterializerRegistration> entries = registry.registrations();
+        assertEquals(java.util.List.of(), entries.getFirst().sourceRepositories());
+        assertEquals(java.util.List.of("Owner/Source"), entries.getLast().sourceRepositories());
+    }
+
+    @Test
+    void refusesUnknownMaterializersAndDuplicateAssociations() throws IOException {
+        stubRegistry("""
+                {"registrations":[{"repositoryName":"owner/one","sourceRepositories":["owner/source"]}]}
+                """);
+        assertThrows(IllegalStateException.class,
+                () -> materializerRegistryStore.registerSource("owner/one", "OWNER/source"));
+        verify(repository, org.mockito.Mockito.never()).createContent();
+        stubRegistry("{\"registrations\":[]}");
+        assertThrows(IllegalStateException.class,
+                () -> materializerRegistryStore.registerSource("owner/two", "owner/source"));
+        verify(repository, org.mockito.Mockito.never()).createContent();
     }
 
     private void assertUpdatedRegistrations(GHContentBuilder writer) throws IOException {
