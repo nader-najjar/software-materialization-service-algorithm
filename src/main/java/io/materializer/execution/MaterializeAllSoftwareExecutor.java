@@ -1,8 +1,9 @@
 package io.materializer.execution;
 
+import java.util.Optional;
+
 import com.google.inject.Inject;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.materializer.execution.models.MaterializeSoftwareApplicationInput;
 import io.materializer.livepipelineinputsadvancer.LivePipelineInputsAdvancer;
 import io.materializer.livepipelineinputsreconciler.LivePipelineInputsReconciler;
 import io.materializer.pipelineworkflowgeneration.PipelineWorkflowGenerator;
@@ -10,14 +11,14 @@ import io.materializer.pipelineworkflowpublishing.PipelineWorkflowPublisher;
 import io.materializer.shared.livepipelineinputsstore.LivePipelineInputsStore;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
 import io.materializer.shared.materializerregistrystore.MaterializerRegistryStore;
-import io.materializer.shared.utilities.JsonSanitizer;
+import io.materializer.shared.materializerregistrystore.models.MaterializerRegistration;
 import io.materializer.sourcenotificationreconciler.SourceNotificationReconciler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class MaterializeSoftwareExecutor {
+public class MaterializeAllSoftwareExecutor {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MaterializeSoftwareExecutor.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(MaterializeAllSoftwareExecutor.class);
 
     private final LivePipelineInputsAdvancer livePipelineInputsAdvancer;
     private final LivePipelineInputsReconciler livePipelineInputsReconciler;
@@ -29,7 +30,7 @@ public class MaterializeSoftwareExecutor {
 
     @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Guice manages the injected dependencies")
     @Inject
-    public MaterializeSoftwareExecutor(
+    public MaterializeAllSoftwareExecutor(
             LivePipelineInputsAdvancer livePipelineInputsAdvancer,
             LivePipelineInputsReconciler livePipelineInputsReconciler,
             SourceNotificationReconciler sourceNotificationReconciler,
@@ -47,25 +48,32 @@ public class MaterializeSoftwareExecutor {
         this.materializerRegistryStore = materializerRegistryStore;
     }
 
-    public void execute(String json) {
-        MaterializeSoftwareApplicationInput input = JsonSanitizer.parseAndValidate(
-                json,
-                MaterializeSoftwareApplicationInput.class
-        );
-        boolean registered = materializerRegistryStore.read().registrations().stream()
-                .anyMatch(registration -> registration.repositoryName().equalsIgnoreCase(input.pipelineRepository()));
-        if (!registered) {
-            throw new IllegalStateException("Pipeline is not registered: " + input.pipelineRepository());
+    public void execute() {
+        for (MaterializerRegistration registration : materializerRegistryStore.read().registrations()) {
+            try {
+                materialize(registration);
+            } catch (RuntimeException exception) {
+                LOGGER.error("Could not materialize {}", registration.repositoryName(), exception);
+            }
         }
-        LivePipelineInputs inputs = livePipelineInputsAdvancer.advance(
-                input.pipelineRepository(),
-                input.pushEvent()
-        );
-        LivePipelineInputs reconciledInputs = livePipelineInputsReconciler.reconcile(inputs);
-        sourceNotificationReconciler.reconcile(inputs, reconciledInputs);
-        livePipelineInputsStore.write(reconciledInputs);
-        String workflowYaml = pipelineWorkflowGenerator.generate(reconciledInputs);
-        pipelineWorkflowPublisher.publish(input.pipelineRepository(), workflowYaml);
-        LOGGER.info("Materialized {}", input.pipelineRepository());
+    }
+
+    private void materialize(MaterializerRegistration registration) {
+        String repositoryName = registration.repositoryName();
+        Optional<LivePipelineInputs> advanced = livePipelineInputsAdvancer.advance(repositoryName);
+        if (advanced.isEmpty()) {
+            LOGGER.info("Skipped materialization for {}: no new pushes", repositoryName);
+            return;
+        }
+        LivePipelineInputs current = livePipelineInputsReconciler.reconcile(registration, advanced.get());
+        sourceNotificationReconciler.reconcile(advanced.get(), current);
+        livePipelineInputsStore.write(current);
+        if (current.declaredRepositorySnapshots().isEmpty()) {
+            LOGGER.info("Pipeline {} is idle", repositoryName);
+            return;
+        }
+        String workflowYaml = pipelineWorkflowGenerator.generate(current);
+        pipelineWorkflowPublisher.publish(repositoryName, workflowYaml);
+        LOGGER.info("Materialized {}", repositoryName);
     }
 }

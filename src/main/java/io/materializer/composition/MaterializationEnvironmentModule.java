@@ -15,9 +15,7 @@ public class MaterializationEnvironmentModule extends AbstractModule {
             System.getenv("LIVE_PIPELINE_INPUTS_STORE_REPOSITORY"),
             System.getenv("MATERIALIZATION_SERVICE_REPOSITORY"),
             System.getenv("MATERIALIZATION_DISPATCH_CLIENT_ID"),
-            System.getenv("MATERIALIZATION_DISPATCH_PRIVATE_KEY"),
-            null,
-            null
+            System.getenv("MATERIALIZATION_DISPATCH_PRIVATE_KEY")
     );
 
     @Provides

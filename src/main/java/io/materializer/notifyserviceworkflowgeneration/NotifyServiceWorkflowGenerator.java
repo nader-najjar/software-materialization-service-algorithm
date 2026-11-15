@@ -17,9 +17,8 @@ public class NotifyServiceWorkflowGenerator {
         this.serviceRepository = serviceRepository;
     }
 
-    public String generate(String pipelineRepository, String branch) {
+    public String generate(String branch) {
         return generate(
-                pipelineRepository,
                 branch,
                 "MATERIALIZATION_DISPATCH_CLIENT_ID",
                 "MATERIALIZATION_DISPATCH_PRIVATE_KEY"
@@ -27,7 +26,6 @@ public class NotifyServiceWorkflowGenerator {
     }
 
     public String generate(
-            String pipelineRepository,
             String branch,
             String clientIDVariable,
             String privateKeySecret
@@ -40,7 +38,6 @@ public class NotifyServiceWorkflowGenerator {
             String[] repositoryParts = serviceRepository.split("/", 2);
             environment.put("SERVICE_OWNER", repositoryParts[0]);
             environment.put("SERVICE_REPOSITORY", repositoryParts[1]);
-            environment.put("PIPELINE_REPOSITORY", pipelineRepository);
 
             ObjectNode push = (ObjectNode) workflow.required("on").required("push");
             push.putArray("branches").add(branch);

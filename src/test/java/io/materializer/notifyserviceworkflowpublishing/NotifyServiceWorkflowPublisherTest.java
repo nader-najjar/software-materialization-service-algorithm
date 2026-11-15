@@ -10,7 +10,6 @@ import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Answers.RETURNS_SELF;
 import static org.mockito.Mockito.mock;
@@ -28,10 +27,8 @@ class NotifyServiceWorkflowPublisherTest {
     @Test
     void createsNotificationOnTheSelectedBranch() throws IOException {
         when(gitHub.getRepository("owner/pipeline")).thenReturn(repository);
-        when(repository.getDefaultBranch()).thenReturn("development");
         when(repository.createContent()).thenReturn(contentBuilder);
 
-        assertEquals("development", publisher.defaultBranch("owner/pipeline"));
         publisher.publish("owner/pipeline", "development", ".github/workflows/notify-service.yml", "workflow");
 
         verify(contentBuilder).path(".github/workflows/notify-service.yml");

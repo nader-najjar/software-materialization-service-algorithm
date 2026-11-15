@@ -19,7 +19,7 @@ class PossibleEnvironmentVariablesTest {
     @ValueSource(strings = {" ", "\n"})
     void rejectsMissingValues(String value) {
         PossibleEnvironmentVariables environmentVariables =
-                new PossibleEnvironmentVariables(value, null, null, null, null, null, null, null);
+                new PossibleEnvironmentVariables(value, null, null, null, null, null);
         assertThrows(ValidationException.class, () -> HibernateValidatorUtility.validateProperties(
                 environmentVariables,
                 "githubToken"
@@ -29,7 +29,7 @@ class PossibleEnvironmentVariablesTest {
     @Test
     void validatesOnlyTheSelectedProperty() {
         PossibleEnvironmentVariables environmentVariables =
-                new PossibleEnvironmentVariables(null, null, "owner/repo", null, null, null, null, null);
+                new PossibleEnvironmentVariables(null, null, "owner/repo", null, null, null);
         assertDoesNotThrow(() -> HibernateValidatorUtility.validateProperties(
                 environmentVariables,
                 "pipelineInputsRepository"
@@ -39,7 +39,7 @@ class PossibleEnvironmentVariablesTest {
     @Test
     void rejectsInvalidRepositoriesWithoutExposingTheValue() {
         PossibleEnvironmentVariables environmentVariables =
-                new PossibleEnvironmentVariables(null, null, "invalid-value", null, null, null, null, null);
+                new PossibleEnvironmentVariables(null, null, "invalid-value", null, null, null);
         ValidationException exception = assertThrows(ValidationException.class,
                 () -> HibernateValidatorUtility.validateProperties(environmentVariables, "pipelineInputsRepository"));
         assertFalse(exception.getMessage().contains("invalid-value"));

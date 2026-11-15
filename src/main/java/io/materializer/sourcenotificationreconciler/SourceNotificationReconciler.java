@@ -45,7 +45,7 @@ public class SourceNotificationReconciler {
         ).toString().replace("-", "");
         for (RepositorySnapshot source : current.declaredRepositorySnapshots()) {
             if (!containsBranch(previous.declaredRepositorySnapshots(), source)) {
-                installNotification(pipelineRepository, notificationID, source);
+                installNotification(notificationID, source);
             }
         }
         for (RepositorySnapshot source : previous.declaredRepositorySnapshots()) {
@@ -55,11 +55,10 @@ public class SourceNotificationReconciler {
         }
     }
 
-    private void installNotification(String pipelineRepository, String notificationID, RepositorySnapshot source) {
+    private void installNotification(String notificationID, RepositorySnapshot source) {
         String clientIDVariable = "DISPATCH_CLIENT_ID_" + notificationID;
         String privateKeySecret = "DISPATCH_PRIVATE_KEY_" + notificationID;
         String workflow = notifyServiceWorkflowGenerator.generate(
-                pipelineRepository,
                 source.branch(),
                 clientIDVariable,
                 privateKeySecret

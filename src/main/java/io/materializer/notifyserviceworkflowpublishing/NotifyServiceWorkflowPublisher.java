@@ -21,15 +21,6 @@ public class NotifyServiceWorkflowPublisher {
         this.gitHub = gitHub;
     }
 
-    public String defaultBranch(String repositoryName) {
-        try {
-            return gitHub.getRepository(repositoryName).getDefaultBranch();
-
-        } catch (IOException exception) {
-            throw new UncheckedIOException("Could not read repository default branch: " + repositoryName, exception);
-        }
-    }
-
     public void publish(String repositoryName, String branch, String path, String workflowYaml) {
         try {
             GHRepository repository = gitHub.getRepository(repositoryName);

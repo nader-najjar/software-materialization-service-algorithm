@@ -15,9 +15,7 @@ public class RegistrationEnvironmentModule extends AbstractModule {
             System.getenv("LIVE_PIPELINE_INPUTS_STORE_REPOSITORY"),
             System.getenv("MATERIALIZATION_SERVICE_REPOSITORY"),
             System.getenv("MATERIALIZATION_DISPATCH_CLIENT_ID"),
-            System.getenv("MATERIALIZATION_DISPATCH_PRIVATE_KEY"),
-            System.getenv("MATERIALIZATION_PUBLISH_CLIENT_ID"),
-            System.getenv("MATERIALIZATION_PUBLISH_PRIVATE_KEY")
+            System.getenv("MATERIALIZATION_DISPATCH_PRIVATE_KEY")
     );
 
     @Provides
@@ -66,21 +64,5 @@ public class RegistrationEnvironmentModule extends AbstractModule {
     String provideMaterializationDispatchPrivateKey() {
         HibernateValidatorUtility.validateProperties(environmentVariables, "materializationDispatchPrivateKey");
         return environmentVariables.materializationDispatchPrivateKey();
-    }
-
-    @Provides
-    @Singleton
-    @Named("materializationPublishClientID")
-    String provideMaterializationPublishClientID() {
-        HibernateValidatorUtility.validateProperties(environmentVariables, "materializationPublishClientID");
-        return environmentVariables.materializationPublishClientID();
-    }
-
-    @Provides
-    @Singleton
-    @Named("materializationPublishPrivateKey")
-    String provideMaterializationPublishPrivateKey() {
-        HibernateValidatorUtility.validateProperties(environmentVariables, "materializationPublishPrivateKey");
-        return environmentVariables.materializationPublishPrivateKey();
     }
 }

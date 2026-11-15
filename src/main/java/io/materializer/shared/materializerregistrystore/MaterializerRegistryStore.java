@@ -44,20 +44,47 @@ public class MaterializerRegistryStore {
         return new MaterializerRegistrySnapshot(registry, content.getSha());
     }
 
-    public void addRegistration(MaterializerRegistrySnapshot snapshot, String repositoryName) {
+    public void addRegistration(MaterializerRegistrySnapshot snapshot, MaterializerRegistration registration) {
         List<MaterializerRegistration> registrations = new ArrayList<>(snapshot.registry().registrations());
-        registrations.add(new MaterializerRegistration(repositoryName));
-        write(new MaterializerRegistry(registrations), snapshot.fileSHA(), repositoryName);
+        registrations.add(registration);
+        write(new MaterializerRegistry(registrations), snapshot.fileSHA(), "Register " + registration.repositoryName());
     }
 
-    private void write(MaterializerRegistry registry, String fileSHA, String repositoryName) {
+    public void registerSource(String materializerRepository, String sourceRepository) {
+        MaterializerRegistrySnapshot snapshot = readSnapshot();
+        List<MaterializerRegistration> registrations = new ArrayList<>(snapshot.registry().registrations());
+        MaterializerRegistration registration = registrations.stream()
+                .filter(entry -> entry.repositoryName().equalsIgnoreCase(materializerRepository))
+                .findFirst()
+                .orElseThrow(
+                        () -> new IllegalStateException("Materializer is not registered: " + materializerRepository)
+                );
+        if (registration.sourceRepositories().stream().anyMatch(sourceRepository::equalsIgnoreCase)) {
+            throw new IllegalStateException(
+                    "Repository " + sourceRepository + " is already registered for " + materializerRepository
+            );
+        }
+        List<String> sources = new ArrayList<>(registration.sourceRepositories());
+        sources.add(sourceRepository);
+        registrations.set(
+                registrations.indexOf(registration),
+                new MaterializerRegistration(registration.repositoryName(), sources)
+        );
+        write(
+                new MaterializerRegistry(registrations),
+                snapshot.fileSHA(),
+                "Register " + sourceRepository + " for " + materializerRepository
+        );
+    }
+
+    private void write(MaterializerRegistry registry, String fileSHA, String commitMessage) {
         try {
             byte[] json = JsonMapperUtility.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(registry);
             gitHub.getRepository(registryRepository).createContent()
                     .path("materializer-registry.json")
                     .sha(fileSHA)
                     .content(json)
-                    .message("Register " + repositoryName)
+                    .message(commitMessage)
                     .commit();
 
         } catch (IOException exception) {

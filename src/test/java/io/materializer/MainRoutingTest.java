@@ -7,11 +7,12 @@ import io.materializer.composition.HttpClientModule;
 import io.materializer.composition.MaterializationEnvironmentModule;
 import io.materializer.composition.RegistrationEnvironmentModule;
 import io.materializer.composition.StrictGuiceModule;
-import io.materializer.execution.MaterializeSoftwareExecutor;
+import io.materializer.execution.MaterializeAllSoftwareExecutor;
 import io.materializer.execution.RegisterExecutor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,7 +29,7 @@ class MainRoutingTest {
         Injector injector = mock(Injector.class);
         RegisterExecutor registerExecutor = mock(RegisterExecutor.class);
         when(injector.getInstance(RegisterExecutor.class)).thenReturn(registerExecutor);
-        try (var guice = mockStatic(Guice.class)) {
+        try (MockedStatic<Guice> guice = mockStatic(Guice.class)) {
             guice.when(() -> Guice.createInjector(
                     eq(Stage.PRODUCTION),
                     any(StrictGuiceModule.class),
@@ -55,9 +56,9 @@ class MainRoutingTest {
     @Test
     void constructsOnlyMaterializationComposition() {
         Injector injector = mock(Injector.class);
-        MaterializeSoftwareExecutor materializeSoftwareExecutor = mock(MaterializeSoftwareExecutor.class);
-        when(injector.getInstance(MaterializeSoftwareExecutor.class)).thenReturn(materializeSoftwareExecutor);
-        try (var guice = mockStatic(Guice.class)) {
+        MaterializeAllSoftwareExecutor materializeAllSoftwareExecutor = mock(MaterializeAllSoftwareExecutor.class);
+        when(injector.getInstance(MaterializeAllSoftwareExecutor.class)).thenReturn(materializeAllSoftwareExecutor);
+        try (MockedStatic<Guice> guice = mockStatic(Guice.class)) {
             guice.when(() -> Guice.createInjector(
                     eq(Stage.PRODUCTION),
                     any(StrictGuiceModule.class),
@@ -67,9 +68,9 @@ class MainRoutingTest {
             ))
                     .thenReturn(injector);
 
-            Main.route(new String[] {"materialize-software", "{}"});
+            Main.route(new String[] {"materialize-all-software"});
 
-            verify(materializeSoftwareExecutor).execute("{}");
+            verify(materializeAllSoftwareExecutor).execute();
             guice.verify(() -> Guice.createInjector(
                     eq(Stage.PRODUCTION),
                     any(StrictGuiceModule.class),
@@ -84,7 +85,7 @@ class MainRoutingTest {
     @ParameterizedTest
     @ValueSource(strings = {"", " ", "unknown", "REGISTER"})
     void rejectsUnknownOperationsBeforeConstructingAnInjector(String operation) {
-        try (var guice = mockStatic(Guice.class)) {
+        try (MockedStatic<Guice> guice = mockStatic(Guice.class)) {
             assertThrows(IllegalArgumentException.class, () -> Main.route(new String[] {operation, "{}"}));
             guice.verifyNoInteractions();
         }
@@ -92,7 +93,9 @@ class MainRoutingTest {
 
     @Test
     void rejectsMissingOrExtraArgumentsBeforeConstructingAnInjector() {
-        try (var guice = mockStatic(Guice.class)) {
+        try (MockedStatic<Guice> guice = mockStatic(Guice.class)) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> Main.route(new String[] {"materialize-all-software", "{}"}));
             assertThrows(IllegalArgumentException.class, () -> Main.route(null));
             assertThrows(IllegalArgumentException.class, () -> Main.route(new String[0]));
             assertThrows(IllegalArgumentException.class, () -> Main.route(new String[] {"register"}));

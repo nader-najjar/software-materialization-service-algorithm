@@ -1,9 +1,13 @@
 package io.materializer.pipelineworkflowgeneration;
 
+import java.util.List;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.inject.Inject;
+import io.materializer.pipelineworkflowgeneration.models.BuildMatrixRow;
 import io.materializer.shared.livepipelinedeclarationfetcher.LivePipelineDeclarationFetcher;
+import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.LivePipelineDeclaration;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
 import io.materializer.shared.utilities.ResourceUtility;
@@ -31,12 +35,17 @@ public class PipelineWorkflowGenerator {
         try {
             ObjectNode workflow = (ObjectNode) YamlMapperUtility.MAPPER.readTree(template);
             ObjectNode build = (ObjectNode) workflow.required("jobs").required("build");
-            build.put("name", declaration.steps().getFirst().name()
+            DeclaredPipelineStep buildStep = declaration.steps().getFirst();
+            build.put("name", buildStep.name()
                     + " ${{ matrix.repositoryName }} (${{ matrix.platform }})");
+            ObjectNode buildEnvironment = (ObjectNode) build.required("env");
+            buildEnvironment.put("CLIENT_ID_VARIABLE", buildStep.clientIdVariable());
+            buildEnvironment.put("PRIVATE_KEY_SECRET", buildStep.privateKeySecret());
             ObjectNode matrix = (ObjectNode) build.required("strategy").required("matrix");
-            matrix.set("include", YamlMapperUtility.MAPPER.valueToTree(
-                    buildMatrixGenerator.generate(declaration.repositories(), inputs.declaredRepositorySnapshots())
-            ));
+            List<BuildMatrixRow> builds = buildMatrixGenerator.generate(
+                    declaration.repositories(), inputs.declaredRepositorySnapshots()
+            );
+            matrix.set("include", YamlMapperUtility.MAPPER.valueToTree(builds));
             return YamlMapperUtility.MAPPER.writeValueAsString(workflow);
 
         } catch (JsonProcessingException exception) {

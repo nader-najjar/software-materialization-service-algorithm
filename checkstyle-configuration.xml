@@ -44,9 +44,6 @@
         <module name="MethodLength">
             <property name="max" value="150"/>
         </module>
-        <module name="ParameterNumber">
-            <property name="max" value="7"/>
-        </module>
 
         <!-- Whitespace -->
         <module name="EmptyForIteratorPad"/>

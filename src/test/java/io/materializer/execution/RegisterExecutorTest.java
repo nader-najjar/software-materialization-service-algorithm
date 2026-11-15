@@ -16,6 +16,9 @@ import io.materializer.shared.materializerregistrystore.models.MaterializerRegis
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHub;
+import org.mockito.InOrder;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
@@ -35,16 +38,14 @@ class RegisterExecutorTest {
             mock(NotifyServiceWorkflowGenerator.class);
     private final NotifyServiceWorkflowPublisher notifyServiceWorkflowPublisher =
             mock(NotifyServiceWorkflowPublisher.class);
+    private final GitHub gitHub = mock(GitHub.class);
     private final RegisterExecutor registerExecutor = new RegisterExecutor(
+            gitHub,
             materializerRegistryStore,
             livePipelineInputsStore,
-            new RegistrationCredentials(
-                    gitHubCredentialStore,
-                    "client-id",
-                    "private-key",
-                    "publish-client-id",
-                    "publish-private-key"
-            ),
+            gitHubCredentialStore,
+            "client-id",
+            "private-key",
             notifyServiceWorkflowGenerator,
             notifyServiceWorkflowPublisher
     );
@@ -59,12 +60,14 @@ class RegisterExecutorTest {
     }
 
     @Test
-    void checksFreshnessBeforeWritingDispatcherCredentials() {
+    void checksFreshnessBeforeWritingDispatcherCredentials() throws IOException {
         prepareRegistry(List.of());
 
-        registerExecutor.execute(INPUT);
+        registerExecutor.execute("""
+                {"repositoryName":"owner/materializer","sourceRepositories":["owner/source"]}
+                """);
 
-        var order = inOrder(
+        InOrder order = inOrder(
                 materializerRegistryStore,
                 livePipelineInputsStore,
                 gitHubCredentialStore,
@@ -74,8 +77,6 @@ class RegisterExecutorTest {
         order.verify(livePipelineInputsStore).read("owner/materializer");
         order.verify(gitHubCredentialStore).variableExists("owner/materializer", "MATERIALIZATION_DISPATCH_CLIENT_ID");
         order.verify(gitHubCredentialStore).secretExists("owner/materializer", "MATERIALIZATION_DISPATCH_PRIVATE_KEY");
-        order.verify(gitHubCredentialStore).variableExists("owner/materializer", "MATERIALIZATION_PUBLISH_CLIENT_ID");
-        order.verify(gitHubCredentialStore).secretExists("owner/materializer", "MATERIALIZATION_PUBLISH_PRIVATE_KEY");
         order.verify(gitHubCredentialStore).setVariable(
                 "owner/materializer",
                 "MATERIALIZATION_DISPATCH_CLIENT_ID",
@@ -86,33 +87,23 @@ class RegisterExecutorTest {
                 "MATERIALIZATION_DISPATCH_PRIVATE_KEY",
                 "private-key"
         );
-        order.verify(gitHubCredentialStore).setVariable(
-                "owner/materializer",
-                "MATERIALIZATION_PUBLISH_CLIENT_ID",
-                "publish-client-id"
-        );
-        order.verify(gitHubCredentialStore).setSecret(
-                "owner/materializer",
-                "MATERIALIZATION_PUBLISH_PRIVATE_KEY",
-                "publish-private-key"
-        );
         order.verify(notifyServiceWorkflowPublisher).publish(
                 "owner/materializer",
-                "main",
+                "development",
                 ".github/workflows/notify-service.yml",
                 "workflow"
         );
         order.verify(materializerRegistryStore).addRegistration(
                 new MaterializerRegistrySnapshot(new MaterializerRegistry(List.of()), "file-sha"),
-                "owner/materializer"
+                new MaterializerRegistration("owner/materializer", List.of("owner/source"))
         );
         verifyNoMoreInteractions(materializerRegistryStore, livePipelineInputsStore);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"owner/materializer", "OWNER/Materializer"})
-    void rejectsExistingRegistration(String repositoryName) {
-        prepareRegistry(List.of(new MaterializerRegistration(repositoryName)));
+    void rejectsExistingRegistration(String repositoryName) throws IOException {
+        prepareRegistry(List.of(new MaterializerRegistration(repositoryName, List.of())));
 
         assertThrows(IllegalStateException.class, () -> registerExecutor.execute(INPUT));
 
@@ -122,7 +113,7 @@ class RegisterExecutorTest {
     }
 
     @Test
-    void rejectsExistingInputs() {
+    void rejectsExistingInputs() throws IOException {
         prepareRegistry(List.of());
         when(livePipelineInputsStore.read("owner/materializer"))
                 .thenReturn(Optional.of(mock(LivePipelineInputs.class)));
@@ -135,7 +126,7 @@ class RegisterExecutorTest {
     }
 
     @Test
-    void propagatesAnInconclusiveSnapshotLookup() {
+    void propagatesAnInconclusiveSnapshotLookup() throws IOException {
         prepareRegistry(List.of());
         when(livePipelineInputsStore.read("owner/materializer"))
                 .thenThrow(new UncheckedIOException(new IOException("Denied")));
@@ -144,7 +135,7 @@ class RegisterExecutorTest {
     }
 
     @Test
-    void rejectsExistingDispatcherClientIDBeforeCheckingSecret() {
+    void rejectsExistingDispatcherClientIDBeforeCheckingSecret() throws IOException {
         prepareRegistry(List.of());
         when(gitHubCredentialStore.variableExists("owner/materializer", "MATERIALIZATION_DISPATCH_CLIENT_ID"))
                 .thenReturn(true);
@@ -155,7 +146,7 @@ class RegisterExecutorTest {
     }
 
     @Test
-    void rejectsExistingDispatcherPrivateKey() {
+    void rejectsExistingDispatcherPrivateKey() throws IOException {
         prepareRegistry(List.of());
         when(gitHubCredentialStore.secretExists("owner/materializer", "MATERIALIZATION_DISPATCH_PRIVATE_KEY"))
                 .thenReturn(true);
@@ -167,7 +158,7 @@ class RegisterExecutorTest {
     }
 
     @Test
-    void stopsProvisioningIfVariableWriteFails() {
+    void stopsProvisioningIfVariableWriteFails() throws IOException {
         prepareRegistry(List.of());
         doThrow(new IllegalStateException("Write failed")).when(gitHubCredentialStore).setVariable(
                 "owner/materializer",
@@ -179,8 +170,6 @@ class RegisterExecutorTest {
 
         verify(gitHubCredentialStore).variableExists("owner/materializer", "MATERIALIZATION_DISPATCH_CLIENT_ID");
         verify(gitHubCredentialStore).secretExists("owner/materializer", "MATERIALIZATION_DISPATCH_PRIVATE_KEY");
-        verify(gitHubCredentialStore).variableExists("owner/materializer", "MATERIALIZATION_PUBLISH_CLIENT_ID");
-        verify(gitHubCredentialStore).secretExists("owner/materializer", "MATERIALIZATION_PUBLISH_PRIVATE_KEY");
         verify(gitHubCredentialStore).setVariable(
                 "owner/materializer",
                 "MATERIALIZATION_DISPATCH_CLIENT_ID",
@@ -190,12 +179,12 @@ class RegisterExecutorTest {
     }
 
     @Test
-    void doesNotSaveRegistrationWhenWorkflowPublicationFails() {
+    void doesNotSaveRegistrationWhenWorkflowPublicationFails() throws IOException {
         prepareRegistry(List.of());
         doThrow(new IllegalStateException("Publication failed")).when(notifyServiceWorkflowPublisher)
                 .publish(
                 "owner/materializer",
-                "main",
+                "development",
                 ".github/workflows/notify-service.yml",
                 "workflow"
         );
@@ -206,9 +195,11 @@ class RegisterExecutorTest {
         verifyNoMoreInteractions(materializerRegistryStore);
     }
 
-    private void prepareRegistry(List<MaterializerRegistration> registrations) {
-        when(notifyServiceWorkflowPublisher.defaultBranch("owner/materializer")).thenReturn("main");
-        when(notifyServiceWorkflowGenerator.generate("owner/materializer", "main"))
+    private void prepareRegistry(List<MaterializerRegistration> registrations) throws IOException {
+        GHRepository repository = mock(GHRepository.class);
+        when(gitHub.getRepository("owner/materializer")).thenReturn(repository);
+        when(repository.getDefaultBranch()).thenReturn("development");
+        when(notifyServiceWorkflowGenerator.generate("development"))
                 .thenReturn("workflow");
         when(materializerRegistryStore.readSnapshot()).thenReturn(
                 new MaterializerRegistrySnapshot(new MaterializerRegistry(registrations), "file-sha")

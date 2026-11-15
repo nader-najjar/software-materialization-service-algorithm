@@ -49,7 +49,7 @@ class LivePipelineInputsStoreTest {
 
         assertThrows(UncheckedIOException.class, () -> livePipelineInputsStore.read("owner/materializer"));
         LivePipelineInputs inputs = new LivePipelineInputs(
-                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40)),
+                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40), 1L),
                 List.of()
         );
         assertThrows(UncheckedIOException.class, () -> livePipelineInputsStore.write(inputs));
@@ -67,7 +67,7 @@ class LivePipelineInputsStoreTest {
     void readsInputsAtTheBranchCommitUsingACaseInsensitivePath() throws IOException {
         prepareBranch();
         LivePipelineInputs inputs = new LivePipelineInputs(
-                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40)),
+                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40), 1L),
                 List.of()
         );
         prepareFile(JsonMapperUtility.MAPPER.writeValueAsString(inputs));
@@ -87,7 +87,7 @@ class LivePipelineInputsStoreTest {
     void rejectsInputsForAnotherMaterializer() throws IOException {
         prepareBranch();
         LivePipelineInputs inputs = new LivePipelineInputs(
-                new RepositorySnapshot("owner/other", "main", "a".repeat(40)),
+                new RepositorySnapshot("owner/other", "main", "a".repeat(40), 1L),
                 List.of()
         );
         prepareFile(JsonMapperUtility.MAPPER.writeValueAsString(inputs));
@@ -120,7 +120,7 @@ class LivePipelineInputsStoreTest {
         GHRef ref = mock(GHRef.class);
         when(repository.getRef("heads/main")).thenReturn(ref);
         LivePipelineInputs inputs = new LivePipelineInputs(
-                new RepositorySnapshot("Owner/Materializer", "main", "a".repeat(40)),
+                new RepositorySnapshot("Owner/Materializer", "main", "a".repeat(40), 1L),
                 List.of()
         );
 
@@ -143,7 +143,7 @@ class LivePipelineInputsStoreTest {
         when(repository.getRef("heads/main")).thenReturn(ref);
         doThrow(new IOException("Non-fast-forward update")).when(ref).updateTo("new-commit", false);
         LivePipelineInputs inputs = new LivePipelineInputs(
-                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40)),
+                new RepositorySnapshot("owner/materializer", "main", "a".repeat(40), 1L),
                 List.of()
         );
 

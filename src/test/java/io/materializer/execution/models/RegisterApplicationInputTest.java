@@ -1,5 +1,4 @@
 package io.materializer.execution.models;
-import io.materializer.shared.utilities.JsonMapperUtility;
 import io.materializer.shared.utilities.JsonSanitizer;
 import jakarta.validation.ValidationException;
 import org.junit.jupiter.api.Test;
@@ -20,7 +19,7 @@ class RegisterApplicationInputTest {
         );
 
         assertEquals("owner/materializer", input.repositoryName());
-        assertEquals(1, JsonMapperUtility.MAPPER.valueToTree(input).size());
+        assertEquals(java.util.List.of(), input.sourceRepositories());
     }
 
     @ParameterizedTest
