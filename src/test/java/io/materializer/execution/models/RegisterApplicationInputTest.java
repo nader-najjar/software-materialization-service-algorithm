@@ -8,6 +8,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegisterApplicationInputTest {
 
@@ -20,6 +21,20 @@ class RegisterApplicationInputTest {
 
         assertEquals("owner/materializer", input.repositoryName());
         assertEquals(java.util.List.of(), input.sourceRepositories());
+    }
+
+    @Test
+    void rejectsSourceRepositoriesThatDifferOnlyInCase() {
+        String json = """
+                {"repositoryName":"owner/materializer","sourceRepositories":["Owner/Repo","owner/repo"]}
+                """;
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> JsonSanitizer.parseAndValidate(json, RegisterApplicationInput.class)
+        );
+
+        assertInstanceOf(ValidationException.class, exception.getCause());
+        assertTrue(exception.getMessage().contains("sourceRepositories must contain unique repository names"));
     }
 
     @ParameterizedTest
