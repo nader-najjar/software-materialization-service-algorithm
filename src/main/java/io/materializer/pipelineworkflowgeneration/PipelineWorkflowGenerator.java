@@ -10,10 +10,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.inject.Inject;
 import io.materializer.pipelineworkflowgeneration.models.BuildMatrixRow;
+import io.materializer.pipelineworkflowgeneration.models.PackagingMatrixRow;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.BuildStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineInput;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.LivePipelineDeclaration;
+import io.materializer.shared.livepipelinedeclarationfetcher.models.PackageOCIImageToGHCRStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.ReleaseSource;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.RunCompositeActionStep;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
@@ -24,14 +26,17 @@ import io.materializer.shared.utilities.YamlMapperUtility;
 public class PipelineWorkflowGenerator {
 
     private final BuildMatrixGenerator buildMatrixGenerator;
+    private final PackagingMatrixGenerator packagingMatrixGenerator;
     private final ActionBundleReader actionBundleReader;
 
     @Inject
     public PipelineWorkflowGenerator(
             BuildMatrixGenerator buildMatrixGenerator,
+            PackagingMatrixGenerator packagingMatrixGenerator,
             ActionBundleReader actionBundleReader
     ) {
         this.buildMatrixGenerator = buildMatrixGenerator;
+        this.packagingMatrixGenerator = packagingMatrixGenerator;
         this.actionBundleReader = actionBundleReader;
     }
 
@@ -81,7 +86,7 @@ public class PipelineWorkflowGenerator {
         for (DeclaredPipelineStep step : declaration.steps()) {
             String jobId = "step_" + (jobs.size() + 1);
             ObjectNode job = generateJob(step, jobId, declaration, inputs, files);
-            addJobDependency(job, previousJobId);
+            if (previousJobId != null) { job.put("needs", previousJobId); }
             jobs.set(jobId, job);
             previousJobId = jobId;
         }
@@ -96,6 +101,11 @@ public class PipelineWorkflowGenerator {
     ) throws JsonProcessingException {
         return switch (step.operation()) {
             case "build" -> generateBuildJob((BuildStep) step, declaration, inputs);
+            case "package-oci-image-to-ghcr" -> generatePackagingJob(
+                    (PackageOCIImageToGHCRStep) step,
+                    declaration,
+                    inputs
+            );
             case "run-composite-action" -> generateActionJob(
                     (RunCompositeActionStep) step,
                     declaration,
@@ -105,10 +115,6 @@ public class PipelineWorkflowGenerator {
             );
             default -> throw new IllegalArgumentException("Unknown operation: " + step.operation());
         };
-    }
-
-    private void addJobDependency(ObjectNode job, String previousJobId) {
-        if (previousJobId != null) { job.put("needs", previousJobId); }
     }
 
     private ObjectNode generateBuildJob(
@@ -132,6 +138,30 @@ public class PipelineWorkflowGenerator {
         );
         matrix.set("include", YamlMapperUtility.MAPPER.valueToTree(builds));
         return build;
+    }
+
+    private ObjectNode generatePackagingJob(
+            PackageOCIImageToGHCRStep packagingStep,
+            LivePipelineDeclaration declaration,
+            LivePipelineInputs inputs
+    ) throws JsonProcessingException {
+        String template = ResourceUtility.readString("/pipelineworkflowgeneration/packaging-job-template.yml");
+        ObjectNode packaging = (ObjectNode) YamlMapperUtility.MAPPER.readTree(template);
+        packaging.put(
+                "name",
+                packagingStep.name() + " ${{ matrix.repositoryName }} (${{ matrix.platform }})"
+        );
+        ObjectNode packagingEnvironment = (ObjectNode) packaging.required("env");
+        packagingEnvironment.put("CLIENT_ID_VARIABLE", packagingStep.clientIdVariable());
+        packagingEnvironment.put("PRIVATE_KEY_SECRET", packagingStep.privateKeySecret());
+        ObjectNode matrix = (ObjectNode) packaging.required("strategy").required("matrix");
+        List<PackagingMatrixRow> packagingRows = packagingMatrixGenerator.generate(
+                packagingStep.targets(),
+                declaration.repositories(),
+                inputs.declaredRepositorySnapshots()
+        );
+        matrix.set("include", YamlMapperUtility.MAPPER.valueToTree(packagingRows));
+        return packaging;
     }
 
     private ObjectNode generateActionJob(
@@ -222,6 +252,6 @@ public class PipelineWorkflowGenerator {
                 .orElseThrow(() -> new IllegalStateException(
                         "Missing source pin for %s@%s".formatted(repository.repositoryName(), repository.branch())
                 ));
-        return repository.repositoryName().replace('/', '@') + "-" + source.platform() + "-" + snapshot.commitSHA();
+        return repository.repositoryName().replace("/", "--") + "--" + source.platform() + "--" + snapshot.commitSHA();
     }
 }

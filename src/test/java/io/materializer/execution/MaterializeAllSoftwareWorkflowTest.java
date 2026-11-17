@@ -9,6 +9,7 @@ import io.materializer.livepipelineinputsadvancer.LivePipelineInputsAdvancer;
 import io.materializer.livepipelineinputsreconciler.LivePipelineInputsReconciler;
 import io.materializer.pipelineworkflowgeneration.ActionBundleReader;
 import io.materializer.pipelineworkflowgeneration.BuildMatrixGenerator;
+import io.materializer.pipelineworkflowgeneration.PackagingMatrixGenerator;
 import io.materializer.pipelineworkflowgeneration.PipelineWorkflowGenerator;
 import io.materializer.pipelineworkflowpublishing.PipelineWorkflowPublisher;
 import io.materializer.shared.livepipelinedeclarationfetcher.LivePipelineDeclarationFetcher;
@@ -72,6 +73,7 @@ class MaterializeAllSoftwareWorkflowTest {
             livePipelineDeclarationFetcher,
             new PipelineWorkflowGenerator(
                     new BuildMatrixGenerator(),
+                    new PackagingMatrixGenerator(),
                     mock(ActionBundleReader.class)
             ),
             new PipelineWorkflowPublisher(gitHub),
