@@ -98,10 +98,14 @@ class NotifyServiceWorkflowPublisherTest {
     }
 
     private void stubNotificationCommit() throws IOException {
-        GHContentUpdateResponse response = mock(GHContentUpdateResponse.class);
         GitCommit commit = mock(GitCommit.class);
-        when(response.getCommit()).thenReturn(commit);
         when(commit.getSHA1()).thenReturn("notification-sha");
+        GHContentUpdateResponse response = new GHContentUpdateResponse() {
+            @Override
+            public GitCommit getCommit() {
+                return commit;
+            }
+        };
         when(contentBuilder.commit()).thenReturn(response);
     }
 }
