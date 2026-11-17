@@ -1,5 +1,6 @@
 package io.materializer.execution;
 
+import java.util.Map;
 import java.util.Optional;
 
 import com.google.inject.Inject;
@@ -8,6 +9,8 @@ import io.materializer.livepipelineinputsadvancer.LivePipelineInputsAdvancer;
 import io.materializer.livepipelineinputsreconciler.LivePipelineInputsReconciler;
 import io.materializer.pipelineworkflowgeneration.PipelineWorkflowGenerator;
 import io.materializer.pipelineworkflowpublishing.PipelineWorkflowPublisher;
+import io.materializer.shared.livepipelinedeclarationfetcher.LivePipelineDeclarationFetcher;
+import io.materializer.shared.livepipelinedeclarationfetcher.models.LivePipelineDeclaration;
 import io.materializer.shared.livepipelineinputsstore.LivePipelineInputsStore;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
 import io.materializer.shared.materializerregistrystore.MaterializerRegistryStore;
@@ -24,6 +27,7 @@ public class MaterializeAllSoftwareExecutor {
     private final LivePipelineInputsReconciler livePipelineInputsReconciler;
     private final SourceNotificationReconciler sourceNotificationReconciler;
     private final LivePipelineInputsStore livePipelineInputsStore;
+    private final LivePipelineDeclarationFetcher livePipelineDeclarationFetcher;
     private final PipelineWorkflowGenerator pipelineWorkflowGenerator;
     private final PipelineWorkflowPublisher pipelineWorkflowPublisher;
     private final MaterializerRegistryStore materializerRegistryStore;
@@ -35,6 +39,7 @@ public class MaterializeAllSoftwareExecutor {
             LivePipelineInputsReconciler livePipelineInputsReconciler,
             SourceNotificationReconciler sourceNotificationReconciler,
             LivePipelineInputsStore livePipelineInputsStore,
+            LivePipelineDeclarationFetcher livePipelineDeclarationFetcher,
             PipelineWorkflowGenerator pipelineWorkflowGenerator,
             PipelineWorkflowPublisher pipelineWorkflowPublisher,
             MaterializerRegistryStore materializerRegistryStore
@@ -43,6 +48,7 @@ public class MaterializeAllSoftwareExecutor {
         this.livePipelineInputsReconciler = livePipelineInputsReconciler;
         this.sourceNotificationReconciler = sourceNotificationReconciler;
         this.livePipelineInputsStore = livePipelineInputsStore;
+        this.livePipelineDeclarationFetcher = livePipelineDeclarationFetcher;
         this.pipelineWorkflowGenerator = pipelineWorkflowGenerator;
         this.pipelineWorkflowPublisher = pipelineWorkflowPublisher;
         this.materializerRegistryStore = materializerRegistryStore;
@@ -65,15 +71,19 @@ public class MaterializeAllSoftwareExecutor {
             LOGGER.info("Skipped materialization for {}: no new pushes", repositoryName);
             return;
         }
-        LivePipelineInputs current = livePipelineInputsReconciler.reconcile(registration, advanced.get());
-        current = sourceNotificationReconciler.reconcile(advanced.get(), current);
+        LivePipelineInputs advancedInputs = advanced.get();
+        LivePipelineDeclaration declaration = livePipelineDeclarationFetcher.fetchAndValidate(
+                advancedInputs.materializerRepositorySnapshot()
+        );
+        LivePipelineInputs current = livePipelineInputsReconciler.reconcile(registration, advancedInputs, declaration);
+        current = sourceNotificationReconciler.reconcile(advancedInputs, current);
         livePipelineInputsStore.write(current);
         if (current.declaredRepositorySnapshots().isEmpty()) {
             LOGGER.info("Pipeline {} is idle", repositoryName);
             return;
         }
-        String workflowYaml = pipelineWorkflowGenerator.generate(current);
-        pipelineWorkflowPublisher.publish(repositoryName, workflowYaml);
+        Map<String, String> files = pipelineWorkflowGenerator.generate(declaration, current);
+        pipelineWorkflowPublisher.publish(repositoryName, files);
         LOGGER.info("Materialized {}", repositoryName);
     }
 }

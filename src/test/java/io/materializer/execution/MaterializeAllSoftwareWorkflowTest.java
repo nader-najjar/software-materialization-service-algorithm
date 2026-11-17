@@ -7,12 +7,13 @@ import java.util.Optional;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.materializer.livepipelineinputsadvancer.LivePipelineInputsAdvancer;
 import io.materializer.livepipelineinputsreconciler.LivePipelineInputsReconciler;
+import io.materializer.pipelineworkflowgeneration.ActionBundleReader;
 import io.materializer.pipelineworkflowgeneration.BuildMatrixGenerator;
 import io.materializer.pipelineworkflowgeneration.PipelineWorkflowGenerator;
 import io.materializer.pipelineworkflowpublishing.PipelineWorkflowPublisher;
 import io.materializer.shared.livepipelinedeclarationfetcher.LivePipelineDeclarationFetcher;
+import io.materializer.shared.livepipelinedeclarationfetcher.models.BuildStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineInput;
-import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.LivePipelineDeclaration;
 import io.materializer.shared.livepipelineinputsstore.LivePipelineInputsStore;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
@@ -68,7 +69,11 @@ class MaterializeAllSoftwareWorkflowTest {
             livePipelineInputsReconciler,
             sourceNotificationReconciler,
             livePipelineInputsStore,
-            new PipelineWorkflowGenerator(livePipelineDeclarationFetcher, new BuildMatrixGenerator()),
+            livePipelineDeclarationFetcher,
+            new PipelineWorkflowGenerator(
+                    new BuildMatrixGenerator(),
+                    mock(ActionBundleReader.class)
+            ),
             new PipelineWorkflowPublisher(gitHub),
             materializerRegistryStore
     );
@@ -78,18 +83,19 @@ class MaterializeAllSoftwareWorkflowTest {
         preparePublication();
         materializeAllSoftwareExecutor.execute();
 
+        verify(livePipelineDeclarationFetcher).fetchAndValidate(reconciledInputs.materializerRepositorySnapshot());
         InOrder order = inOrder(sourceNotificationReconciler, livePipelineInputsStore, treeBuilder, repository);
         order.verify(sourceNotificationReconciler).reconcile(any(), eq(reconciledInputs));
         order.verify(livePipelineInputsStore).write(reconciledInputs);
         ArgumentCaptor<String> yaml = ArgumentCaptor.forClass(String.class);
-        order.verify(treeBuilder).add(eq(".github/workflows/materialize.yml"), yaml.capture(), eq(false));
         verifyPublishedActions(order);
+        order.verify(treeBuilder).add(eq(".github/workflows/materialize.yml"), yaml.capture(), eq(false));
         order.verify(treeBuilder).create();
         order.verify(repository).createRef("refs/heads/execution", "published-commit");
 
 
         JsonNode workflow = YamlMapperUtility.MAPPER.readTree(yaml.getValue());
-        JsonNode job = workflow.path("jobs").path("build");
+        JsonNode job = workflow.path("jobs").path("step_1");
         JsonNode row = job.path("strategy").path("matrix").path("include").get(0);
         assertEquals("owner/source", row.path("repositoryName").asText());
         assertEquals("b".repeat(40), row.path("commitSHA").asText());
@@ -121,7 +127,6 @@ class MaterializeAllSoftwareWorkflowTest {
         when(materializerRegistryStore.read()).thenReturn(new MaterializerRegistry(List.of(registration)));
         when(advancer.advance(registration.repositoryName())).thenReturn(Optional.of(reconciledInputs));
         when(sourceNotificationReconciler.reconcile(reconciledInputs, reconciledInputs)).thenReturn(reconciledInputs);
-        when(livePipelineInputsReconciler.reconcile(registration, reconciledInputs)).thenReturn(reconciledInputs);
         DeclaredPipelineInput input = new DeclaredPipelineInput(
                 "owner/source",
                 "main",
@@ -130,10 +135,13 @@ class MaterializeAllSoftwareWorkflowTest {
         );
         LivePipelineDeclaration declaration = new LivePipelineDeclaration(
                 List.of(input),
-                List.of(new DeclaredPipelineStep("Build", "build", "APP_ID", "APP_KEY"))
+                List.of(new BuildStep("Build", "build", "APP_ID", "APP_KEY"))
         );
         when(livePipelineDeclarationFetcher.fetchAndValidate(reconciledInputs.materializerRepositorySnapshot()))
                 .thenReturn(declaration);
+        when(livePipelineInputsReconciler.reconcile(registration, reconciledInputs, declaration))
+                .thenReturn(reconciledInputs);
+
         when(gitHub.getRepository("owner/materializer")).thenReturn(repository);
         when(repository.getBranches()).thenReturn(Map.of());
         when(repository.createTree()).thenReturn(treeBuilder);
@@ -152,7 +160,11 @@ class MaterializeAllSoftwareWorkflowTest {
                 "actions/reject-manual-retries/check.sh",
                 "actions/universal-build/action.yml"
         )) {
-            order.verify(treeBuilder).add(".github/" + resource, ResourceUtility.readString("/" + resource), false);
+            order.verify(treeBuilder).add(
+                    ".github/" + resource,
+                    ResourceUtility.readString("/" + resource),
+                    false
+            );
         }
     }
 }

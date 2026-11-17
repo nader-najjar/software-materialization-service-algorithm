@@ -1,0 +1,8 @@
+name: ""
+runs-on: ubuntu-24.04-arm
+steps:
+  - name: Reject Manual Retries
+    uses: $/.github/actions/reject-manual-retries
+
+  - name: Run Composite Action
+    uses: $/@@ACTION_PATH@@

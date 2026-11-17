@@ -2,11 +2,10 @@ package io.materializer.pipelineworkflowpublishing;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.List;
+import java.util.Map;
 
 import com.google.inject.Inject;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.materializer.shared.utilities.ResourceUtility;
 import org.kohsuke.github.GHBranch;
 import org.kohsuke.github.GHCommit;
 import org.kohsuke.github.GHCommitBuilder;
@@ -25,7 +24,7 @@ public final class PipelineWorkflowPublisher {
         this.gitHub = gitHub;
     }
 
-    public void publish(String materializerRepositoryName, String workflowYaml) {
+    public void publish(String materializerRepositoryName, Map<String, String> files) {
         try {
             GHRepository repository = gitHub.getRepository(materializerRepositoryName);
             GHBranch executionBranch = repository.getBranches().get("execution");
@@ -34,12 +33,12 @@ public final class PipelineWorkflowPublisher {
 
             if (executionBranch != null) {
                 String parentCommitSHA = executionBranch.getSHA1();
-                treeBuilder.baseTree(repository.getCommit(parentCommitSHA).getTree().getSha());
                 commitBuilder.parent(parentCommitSHA);
             }
 
-            treeBuilder.add(".github/workflows/materialize.yml", workflowYaml, false);
-            addActionResources(treeBuilder);
+            for (Map.Entry<String, String> file : files.entrySet()) {
+                treeBuilder.add(file.getKey(), file.getValue(), false);
+            }
             GHTree tree = treeBuilder.create();
             GHCommit commit = commitBuilder.message("Publish materialization workflow").tree(tree.getSha()).create();
 
@@ -55,22 +54,4 @@ public final class PipelineWorkflowPublisher {
             throw new UncheckedIOException(message, exception);
         }
     }
-
-    private void addActionResources(GHTreeBuilder treeBuilder) throws IOException {
-        List<String> resourcePaths = List.of(
-                "actions/reject-manual-retries/action.yml",
-                "actions/reject-manual-retries/check.sh",
-                "actions/universal-build/action.yml",
-                "actions/find-release-artifact/action.yml",
-                "actions/find-release-artifact/find.cjs",
-                "actions/publish-release-artifact/action.yml",
-                "actions/publish-release-artifact/publish.cjs"
-        );
-
-        for (String resourcePath : resourcePaths) {
-            String content = ResourceUtility.readString("/" + resourcePath);
-            treeBuilder.add(".github/" + resourcePath, content, false);
-        }
-    }
-
 }

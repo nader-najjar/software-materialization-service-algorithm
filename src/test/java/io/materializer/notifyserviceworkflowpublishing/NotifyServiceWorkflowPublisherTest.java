@@ -9,6 +9,7 @@ import org.kohsuke.github.GHContentBuilder;
 import org.kohsuke.github.GHContentUpdateResponse;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitCommit;
 import org.kohsuke.github.GitHub;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -97,8 +98,10 @@ class NotifyServiceWorkflowPublisherTest {
     }
 
     private void stubNotificationCommit() throws IOException {
-        GHContentUpdateResponse response = mock(GHContentUpdateResponse.class, org.mockito.Answers.RETURNS_DEEP_STUBS);
+        GHContentUpdateResponse response = mock(GHContentUpdateResponse.class);
+        GitCommit commit = mock(GitCommit.class);
+        when(response.getCommit()).thenReturn(commit);
+        when(commit.getSHA1()).thenReturn("notification-sha");
         when(contentBuilder.commit()).thenReturn(response);
-        when(response.getCommit().getSHA1()).thenReturn("notification-sha");
     }
 }

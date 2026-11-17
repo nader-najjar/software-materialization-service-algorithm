@@ -28,13 +28,7 @@ public class BuildMatrixGenerator {
             DeclaredPipelineInput repository,
             List<RepositorySnapshot> declaredRepositorySnapshots
     ) {
-        RepositorySnapshot snapshot = declaredRepositorySnapshots.stream()
-                .filter(pin -> pin.repositoryName().equalsIgnoreCase(repository.repositoryName()))
-                .filter(pin -> pin.branch().equals(repository.branch()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "Missing source pin for %s@%s".formatted(repository.repositoryName(), repository.branch())
-                ));
+        RepositorySnapshot snapshot = findSourcePin(repository, declaredRepositorySnapshots);
         List<BuildMatrixRow> rows = new ArrayList<>();
         for (String platform : repository.platforms()) {
             rows.add(new BuildMatrixRow(
@@ -46,6 +40,19 @@ public class BuildMatrixGenerator {
             ));
         }
         return rows;
+    }
+
+    private static RepositorySnapshot findSourcePin(
+            DeclaredPipelineInput repository,
+            List<RepositorySnapshot> declaredRepositorySnapshots
+    ) {
+        return declaredRepositorySnapshots.stream()
+                .filter(pin -> pin.repositoryName().equalsIgnoreCase(repository.repositoryName()))
+                .filter(pin -> pin.branch().equals(repository.branch()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Missing source pin for %s@%s".formatted(repository.repositoryName(), repository.branch())
+                ));
     }
 
     private static String runnerForPlatform(String platform) {

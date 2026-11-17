@@ -84,7 +84,7 @@ class MaterializerRegistryValidationTest {
                 () -> JsonSanitizer.parseAndValidate(json, MaterializerRegistry.class)
         );
 
-        String message = "registrations: Materializer repositories must be unique regardless of case";
+        String message = "registrationListUnique: Materializer repositories must be unique regardless of case";
         assertTrue(exception.getMessage().contains(message));
     }
 }

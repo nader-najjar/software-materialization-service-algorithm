@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  step_1:
     env:
       CLIENT_ID_VARIABLE: APP_ID
       PRIVATE_KEY_SECRET: APP_KEY
