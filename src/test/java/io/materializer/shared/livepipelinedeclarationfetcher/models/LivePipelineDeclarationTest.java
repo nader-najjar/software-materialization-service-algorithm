@@ -22,11 +22,20 @@ class LivePipelineDeclarationTest {
                 PIPELINE_JSON,
                 LivePipelineDeclaration.class
         );
-        assertEquals(new DeclaredPipelineStep("build", "build", "APP_ID", "APP_KEY"),
-                livePipelineDeclaration.steps().getFirst());
+        assertEquals(
+                new BuildStep("build", "build", "APP_ID", "APP_KEY"),
+                livePipelineDeclaration.steps().getFirst()
+        );
         DeclaredPipelineInput repository = livePipelineDeclaration.repositories().getFirst();
         assertEquals("owner/pure-java", repository.repositoryName());
         assertEquals("universal", repository.buildSystem());
+    }
+
+    @Test
+    void ignoresTargetsOnBuildSteps() {
+        String json = PIPELINE_JSON.replace("\"operation\":", "\"targets\":[],\"operation\":");
+        LivePipelineDeclaration declaration = JsonSanitizer.parseAndValidate(json, LivePipelineDeclaration.class);
+        assertEquals(new BuildStep("build", "build", "APP_ID", "APP_KEY"), declaration.steps().getFirst());
     }
 
     @Test
@@ -51,7 +60,7 @@ class LivePipelineDeclarationTest {
     }
 
     @Test
-    void requiresExactlyOneBuildStepAtTheStart() {
+    void requiresBuildAsTheFirstStep() {
         String build = """
                 {"name":"Compile","clientIdVariable":"APP_ID","privateKeySecret":"APP_KEY","operation":"build"}
                 """.strip();
@@ -61,8 +70,28 @@ class LivePipelineDeclarationTest {
         assertInvalid(declaration.formatted(""));
         assertInvalid(declaration.formatted(deploy));
         assertInvalid(declaration.formatted(deploy + "," + build));
-        assertInvalid(declaration.formatted(build + "," + build));
+        String deployment = deploymentStepJson();
+        assertInvalid(declaration.formatted(deployment + "," + build));
+        LivePipelineDeclaration pipeline = JsonSanitizer.parseAndValidate(
+                declaration.formatted(build + "," + deployment),
+                LivePipelineDeclaration.class
+        );
+        RunCompositeActionStep action = (RunCompositeActionStep) pipeline.steps().getLast();
+        assertEquals("deploy", action.actionBundlePath());
+        assertEquals(
+                new ReleaseSource("owner/pure-java", "main", "aarch64-linux"),
+                action.replacements().get("ALGORITHM_RELEASE")
+        );
         JsonSanitizer.parseAndValidate(declaration.formatted(build), LivePipelineDeclaration.class);
+    }
+
+    private String deploymentStepJson() {
+        return """
+                {"name":"Deploy","operation":"run-composite-action",
+                 "actionBundlePath":"deploy",
+                 "replacements":{"ALGORITHM_RELEASE":{"repositoryName":"owner/pure-java",
+                 "branch":"main","platform":"aarch64-linux"}}}
+                """.strip();
     }
 
     @Test

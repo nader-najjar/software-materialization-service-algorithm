@@ -4,13 +4,8 @@
   <property name="LOG_LEVEL" value="${LOG_LEVEL:-INFO}"/>
 
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-    <encoder class="ch.qos.logback.classic.encoder.JsonEncoder">
-      <withSequenceNumber>false</withSequenceNumber>
-      <withNanoseconds>false</withNanoseconds>
-      <withContext>false</withContext>
-      <withArguments>false</withArguments>
-      <withMessage>false</withMessage>
-      <withFormattedMessage>true</withFormattedMessage>
+    <encoder>
+      <pattern>%d{MMM d  h:mm a z,America/New_York}  %-5level  %logger{0} - %msg%n%ex%n</pattern>
     </encoder>
   </appender>
 

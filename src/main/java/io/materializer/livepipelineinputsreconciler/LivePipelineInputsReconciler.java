@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Optional;
 
 import com.google.inject.Inject;
-import io.materializer.shared.livepipelinedeclarationfetcher.LivePipelineDeclarationFetcher;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineInput;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.LivePipelineDeclaration;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
@@ -16,22 +15,19 @@ import io.materializer.shared.utilities.HibernateValidatorUtility;
 
 public class LivePipelineInputsReconciler {
 
-    private final LivePipelineDeclarationFetcher livePipelineDeclarationFetcher;
-
     private final RepositoryPushHistory repositoryPushHistory;
 
     @Inject
-    public LivePipelineInputsReconciler(
-            LivePipelineDeclarationFetcher livePipelineDeclarationFetcher,
-            RepositoryPushHistory repositoryPushHistory
-    ) {
-        this.livePipelineDeclarationFetcher = livePipelineDeclarationFetcher;
+    public LivePipelineInputsReconciler(RepositoryPushHistory repositoryPushHistory) {
         this.repositoryPushHistory = repositoryPushHistory;
     }
 
-    public LivePipelineInputs reconcile(MaterializerRegistration registration, LivePipelineInputs inputs) {
+    public LivePipelineInputs reconcile(
+            MaterializerRegistration registration,
+            LivePipelineInputs inputs,
+            LivePipelineDeclaration declaration
+    ) {
         RepositorySnapshot materializerSnapshot = inputs.materializerRepositorySnapshot();
-        LivePipelineDeclaration declaration = livePipelineDeclarationFetcher.fetchAndValidate(materializerSnapshot);
 
         for (DeclaredPipelineInput source : declaration.repositories()) {
             requireRegisteredSource(registration, source.repositoryName());

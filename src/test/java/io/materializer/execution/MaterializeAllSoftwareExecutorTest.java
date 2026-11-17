@@ -8,6 +8,7 @@ import io.materializer.livepipelineinputsadvancer.LivePipelineInputsAdvancer;
 import io.materializer.livepipelineinputsreconciler.LivePipelineInputsReconciler;
 import io.materializer.pipelineworkflowgeneration.PipelineWorkflowGenerator;
 import io.materializer.pipelineworkflowpublishing.PipelineWorkflowPublisher;
+import io.materializer.shared.livepipelinedeclarationfetcher.LivePipelineDeclarationFetcher;
 import io.materializer.shared.livepipelineinputsstore.LivePipelineInputsStore;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
 import io.materializer.shared.materializerregistrystore.MaterializerRegistryStore;
@@ -29,12 +30,14 @@ class MaterializeAllSoftwareExecutorTest {
     private final LivePipelineInputsAdvancer advancer = mock(LivePipelineInputsAdvancer.class);
     private final LivePipelineInputsReconciler reconciler = mock(LivePipelineInputsReconciler.class);
     private final LivePipelineInputsStore store = mock(LivePipelineInputsStore.class);
+    private final LivePipelineDeclarationFetcher fetcher = mock(LivePipelineDeclarationFetcher.class);
     private final PipelineWorkflowPublisher publisher = mock(PipelineWorkflowPublisher.class);
     private final MaterializeAllSoftwareExecutor materializeAllSoftwareExecutor = new MaterializeAllSoftwareExecutor(
             advancer,
             reconciler,
             mock(SourceNotificationReconciler.class),
             store,
+            fetcher,
             mock(PipelineWorkflowGenerator.class),
             publisher,
             materializerRegistryStore
@@ -60,9 +63,15 @@ class MaterializeAllSoftwareExecutorTest {
         RepositoryPushHistory history = mock(RepositoryPushHistory.class);
         SourceNotificationReconciler notifications = mock(SourceNotificationReconciler.class);
         MaterializeAllSoftwareExecutor executor = new MaterializeAllSoftwareExecutor(
-                new LivePipelineInputsAdvancer(history, store), reconciler,
-                notifications, store, mock(PipelineWorkflowGenerator.class),
-                publisher, materializerRegistryStore);
+                new LivePipelineInputsAdvancer(history, store),
+                reconciler,
+                notifications,
+                store,
+                fetcher,
+                mock(PipelineWorkflowGenerator.class),
+                publisher,
+                materializerRegistryStore
+        );
         RepositorySnapshot initial = new RepositorySnapshot(registration.repositoryName(), "main", "a".repeat(40), 1L);
         RepositorySnapshot broken = new RepositorySnapshot(registration.repositoryName(), "main", "b".repeat(40), 2L);
         RepositorySnapshot fixed = new RepositorySnapshot(registration.repositoryName(), "main", "c".repeat(40), 3L);
@@ -81,8 +90,8 @@ class MaterializeAllSoftwareExecutorTest {
         RepositoryPush fixPush = new RepositoryPush(3L, broken.commitSHA(), fixed.commitSHA(), "2026-11-01T00:01:00Z");
         when(history.since(initial)).thenReturn(List.of(badPush, fixPush));
         when(history.since(broken)).thenReturn(List.of(fixPush));
-        when(reconciler.reconcile(registration, brokenInputs)).thenThrow(new IllegalArgumentException("Invalid JSON"));
-        when(reconciler.reconcile(registration, fixedInputs)).thenReturn(fixedInputs);
+        when(fetcher.fetchAndValidate(broken)).thenThrow(new IllegalArgumentException("Invalid JSON"));
+        when(reconciler.reconcile(registration, fixedInputs, null)).thenReturn(fixedInputs);
 
         when(notifications.reconcile(fixedInputs, fixedInputs)).thenReturn(fixedInputs);
 
