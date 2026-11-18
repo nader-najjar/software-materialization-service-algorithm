@@ -67,7 +67,8 @@ steps:
     run: |
       repo='${{ matrix.repositoryName }}'
       image="ghcr.io/${repo,,}:$RELEASE_NAME"
-      docker build "$RUNNER_TEMP/oci-package" \
+      docker buildx build "$RUNNER_TEMP/oci-package" \
         --tag "$image" \
-        --label "org.opencontainers.image.source=https://github.com/$repo"
-      docker push "$image"
+        --label "org.opencontainers.image.source=https://github.com/$repo" \
+        --annotation "index:org.opencontainers.image.source=https://github.com/$repo" \
+        --push
