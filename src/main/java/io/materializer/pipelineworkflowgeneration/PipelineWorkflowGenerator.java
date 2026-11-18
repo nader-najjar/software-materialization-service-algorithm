@@ -155,6 +155,8 @@ public class PipelineWorkflowGenerator {
         ObjectNode packagingEnvironment = (ObjectNode) packaging.required("env");
         packagingEnvironment.put("CLIENT_ID_VARIABLE", packagingStep.clientIdVariable());
         packagingEnvironment.put("PRIVATE_KEY_SECRET", packagingStep.privateKeySecret());
+        packagingEnvironment.put("GHCR_USERNAME", packagingStep.ghcrUsername());
+        packagingEnvironment.put("GHCR_PAT_SECRET", packagingStep.ghcrPATSecret());
         ObjectNode matrix = (ObjectNode) packaging.required("strategy").required("matrix");
         List<PackagingMatrixRow> packagingRows = packagingMatrixGenerator.generate(
                 packagingStep.targets(),

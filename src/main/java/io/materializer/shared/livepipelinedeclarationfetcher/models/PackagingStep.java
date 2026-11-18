@@ -32,6 +32,15 @@ public record PackagingStep(
         @Pattern(regexp = "[A-Za-z_][A-Za-z0-9_]*")
         String privateKeySecret,
 
+        @JsonProperty("ghcrUsername")
+        @NotBlank
+        String ghcrUsername,
+
+        @JsonProperty("ghcrPATSecret")
+        @NotNull
+        @Pattern(regexp = "[A-Za-z_][A-Za-z0-9_]*")
+        String ghcrPATSecret,
+
         @JsonProperty("targets")
         @NotEmpty
         List<@NotNull @Valid ReleaseSource> targets

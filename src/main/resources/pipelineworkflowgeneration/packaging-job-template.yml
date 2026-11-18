@@ -7,6 +7,8 @@ runs-on: ${{ matrix.runner }}
 env:
   CLIENT_ID_VARIABLE: ""
   PRIVATE_KEY_SECRET: ""
+  GHCR_USERNAME: ""
+  GHCR_PAT_SECRET: ""
 steps:
   - name: Reject Manual Retries
     uses: $/.github/actions/reject-manual-retries
@@ -30,7 +32,6 @@ steps:
       owner: ${{ env.REPOSITORY_OWNER }}
       repositories: ${{ matrix.repositoryName }}
       permission-contents: read
-      permission-packages: write
 
   - name: Download and Extract Release
     shell: bash
@@ -58,8 +59,8 @@ steps:
   - name: Log In to GHCR
     shell: bash
     env:
-      GHCR_TOKEN: ${{ steps.create-repository-token.outputs.token }}
-    run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$REPOSITORY_OWNER" --password-stdin
+      GHCR_TOKEN: ${{ secrets[env.GHCR_PAT_SECRET] }}
+    run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
 
   - name: Build and Push Image
     shell: bash
