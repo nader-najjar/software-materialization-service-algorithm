@@ -30,7 +30,7 @@ public record RunCompositeActionStep(
 
         @JsonProperty("replacements")
         @NotNull
-        Map<@NotBlank String, @NotNull @Valid ReleaseSource> replacements
+        Map<@NotBlank String, @NotNull @Valid ActionReplacement> replacements
 
 ) implements DeclaredPipelineStep {
     public RunCompositeActionStep {

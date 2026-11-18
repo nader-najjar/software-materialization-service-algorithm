@@ -18,7 +18,7 @@ public interface DeclaredPipelineStep {
             case "build":
                 return JsonMapperUtility.MAPPER.treeToValue(step, BuildStep.class);
             case "package-oci-image-to-ghcr":
-                return JsonMapperUtility.MAPPER.treeToValue(step, PackageOCIImageToGHCRStep.class);
+                return JsonMapperUtility.MAPPER.treeToValue(step, PackagingStep.class);
             case "run-composite-action":
                 return JsonMapperUtility.MAPPER.treeToValue(step, RunCompositeActionStep.class);
             default:

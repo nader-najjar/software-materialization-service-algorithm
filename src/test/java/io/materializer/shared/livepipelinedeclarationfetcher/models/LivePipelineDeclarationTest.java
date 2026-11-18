@@ -79,17 +79,68 @@ class LivePipelineDeclarationTest {
         RunCompositeActionStep action = (RunCompositeActionStep) pipeline.steps().getLast();
         assertEquals("deploy", action.actionBundlePath());
         assertEquals(
-                new ReleaseSource("owner/pure-java", "main", "aarch64-linux"),
+                new ActionReplacement("release-artifact", "owner/pure-java", "main", "aarch64-linux"),
                 action.replacements().get("ALGORITHM_RELEASE")
         );
         JsonSanitizer.parseAndValidate(declaration.formatted(build), LivePipelineDeclaration.class);
+    }
+
+    @Test
+    void allowsOneBuildAndOnlyAllowsPackagingImmediatelyAfterIt() {
+        String build = """
+                {"name":"build","clientIdVariable":"APP_ID","privateKeySecret":"APP_KEY","operation":"build"}
+                """.strip();
+
+        String packaging = """
+                {"name":"Package","operation":"package-oci-image-to-ghcr","clientIdVariable":"APP_ID",
+                 "privateKeySecret":"APP_KEY","targets":[{"repositoryName":"owner/pure-java",
+                 "branch":"main","platform":"aarch64-linux"}]}
+                """.strip();
+
+        String action = deploymentStepJson();
+        String declaration = PIPELINE_JSON.replace(build, "%s");
+
+        assertInvalid(declaration.formatted(String.join(",", build, build)));
+        assertInvalid(declaration.formatted(String.join(",", build, packaging, packaging)));
+        assertInvalid(declaration.formatted(String.join(",", build, action, packaging)));
+        JsonSanitizer.parseAndValidate(
+                declaration.formatted(String.join(",", build, packaging, action, action)),
+                LivePipelineDeclaration.class
+        );
+    }
+
+    @Test
+    void validatesReplacementArtifactKind() {
+        String action = deploymentStepJson();
+        RunCompositeActionStep image = JsonSanitizer.parseAndValidate(
+                action.replace("release-artifact", "oci-image"),
+                RunCompositeActionStep.class
+        );
+
+        assertEquals("oci-image", image.replacements().get("ALGORITHM_RELEASE").artifactKind());
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> JsonSanitizer.parseAndValidate(
+                        action.replace("\"artifactKind\":\"release-artifact\",", ""),
+                        RunCompositeActionStep.class
+                )
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> JsonSanitizer.parseAndValidate(
+                        action.replace("release-artifact", "invalid"),
+                        RunCompositeActionStep.class
+                )
+        );
     }
 
     private String deploymentStepJson() {
         return """
                 {"name":"Deploy","operation":"run-composite-action",
                  "actionBundlePath":"deploy",
-                 "replacements":{"ALGORITHM_RELEASE":{"repositoryName":"owner/pure-java",
+                 "replacements":{"ALGORITHM_RELEASE":{"artifactKind":"release-artifact",
+                 "repositoryName":"owner/pure-java",
                  "branch":"main","platform":"aarch64-linux"}}}
                 """.strip();
     }

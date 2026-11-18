@@ -11,7 +11,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
-public record PackageOCIImageToGHCRStep(
+public record PackagingStep(
 
         @JsonProperty("name")
         @NotBlank
@@ -37,7 +37,7 @@ public record PackageOCIImageToGHCRStep(
         List<@NotNull @Valid ReleaseSource> targets
 
 ) implements DeclaredPipelineStep {
-    public PackageOCIImageToGHCRStep {
+    public PackagingStep {
         targets = targets == null ? null : Collections.unmodifiableList(new ArrayList<>(targets));
     }
 }
