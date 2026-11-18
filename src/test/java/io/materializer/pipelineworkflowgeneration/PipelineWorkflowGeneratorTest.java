@@ -5,10 +5,11 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.materializer.shared.livepipelinedeclarationfetcher.models.ActionReplacement;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.BuildStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineInput;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.LivePipelineDeclaration;
-import io.materializer.shared.livepipelinedeclarationfetcher.models.PackageOCIImageToGHCRStep;
+import io.materializer.shared.livepipelinedeclarationfetcher.models.PackagingStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.ReleaseSource;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.RunCompositeActionStep;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
@@ -21,6 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -111,9 +113,9 @@ class PipelineWorkflowGeneratorTest {
                 Map.of("private-key", "${{ secrets.APP_KEY }}"),
                 Map.of(
                         "@@APP@@",
-                        new ReleaseSource("OWNER/APP", "release", "aarch64-linux"),
+                        new ActionReplacement("release-artifact", "OWNER/APP", "release", "aarch64-linux"),
                         "MAIN",
-                        new ReleaseSource("owner/app", "main", "aarch64-linux")
+                        new ActionReplacement("release-artifact", "owner/app", "main", "aarch64-linux")
                 )
         );
     }
@@ -149,21 +151,55 @@ class PipelineWorkflowGeneratorTest {
                 new RepositorySnapshot("owner/app", "main", "b".repeat(40), 1L),
                 new RepositorySnapshot("owner/app", "release", "c".repeat(40), 2L)
         );
-        when(actionBundleReader.readFiles(materializer, "check")).thenReturn(Map.of("action.yml", "check action"));
+        when(actionBundleReader.readFiles(materializer, "check")).thenReturn(Map.of("action.yml", "@@IMAGE@@"));
         Map<String, String> files = generator.generate(
                 packagingDeclaration(platform),
                 new LivePipelineInputs(materializer, savedSourceSnapshots)
         );
         String workflowYaml = files.get(".github/workflows/materialize.yml");
         JsonNode jobs = YamlMapperUtility.MAPPER.readTree(workflowYaml).required("jobs");
+        assertEquals(
+                "ghcr.io/owner/app:Owner--App--" + platform + "--" + "c".repeat(40),
+                files.get(".github/actions/step_3/action.yml")
+        );
+
         assertPackagingJobOrder(jobs);
         assertPackagingCredentials(jobs.required("step_2"));
         assertPackagingMatrix(jobs.at("/step_2/strategy/matrix/include"), platform);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"no packaging", "different platform"})
+    void rejectsImageReplacementsWithoutAMatchingTarget(String scenario) {
+        LivePipelineDeclaration original = packagingDeclaration("x86_64-linux");
+        LivePipelineDeclaration arm = packagingDeclaration("aarch64-linux");
+        LivePipelineDeclaration declaration = new LivePipelineDeclaration(
+                original.repositories(),
+                scenario.equals("no packaging")
+                        ? List.of(original.steps().getFirst(), original.steps().getLast())
+                        : List.of(original.steps().getFirst(), arm.steps().get(1), original.steps().getLast())
+        );
+
+        RepositorySnapshot materializer = new RepositorySnapshot("owner/mat", "main", "a".repeat(40), 1L);
+        LivePipelineInputs inputs = new LivePipelineInputs(
+                materializer,
+                List.of(
+                        new RepositorySnapshot("owner/app", "main", "b".repeat(40), 1L),
+                        new RepositorySnapshot("owner/app", "release", "c".repeat(40), 2L)
+                )
+        );
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> generator.generate(declaration, inputs)
+        );
+
+        assertEquals("No declared OCI image for owner/app@release on x86_64-linux", error.getMessage());
+    }
+
     private LivePipelineDeclaration packagingDeclaration(String platform) {
         BuildStep build = new BuildStep("Build", "build", "APP_ID", "APP_KEY");
-        PackageOCIImageToGHCRStep packaging = new PackageOCIImageToGHCRStep(
+        PackagingStep packaging = new PackagingStep(
                 "Package Selected Image",
                 "package-oci-image-to-ghcr",
                 "PACKAGE_APP_ID",
@@ -175,7 +211,7 @@ class PipelineWorkflowGeneratorTest {
                 "run-composite-action",
                 "check",
                 Map.of(),
-                Map.of()
+                Map.of("@@IMAGE@@", new ActionReplacement("oci-image", "owner/app", "release", platform))
         );
         return new LivePipelineDeclaration(
                 packagingBuildInputs(),
@@ -187,7 +223,7 @@ class PipelineWorkflowGeneratorTest {
         List<String> platforms = List.of("aarch64-linux", "x86_64-linux");
         return List.of(
                 new DeclaredPipelineInput("owner/app", "main", "universal", platforms),
-                new DeclaredPipelineInput("owner/app", "release", "universal", platforms)
+                new DeclaredPipelineInput("Owner/App", "release", "universal", platforms)
         );
     }
 
@@ -221,7 +257,7 @@ class PipelineWorkflowGeneratorTest {
     private void assertPackagingMatrix(JsonNode rows, String platform) {
         assertEquals(1, rows.size());
         JsonNode row = rows.required(0);
-        assertEquals("owner/app", row.required("repositoryName").asText());
+        assertEquals("Owner/App", row.required("repositoryName").asText());
         assertEquals("c".repeat(40), row.required("commitSHA").asText());
         assertEquals(platform, row.required("platform").asText());
         assertEquals(

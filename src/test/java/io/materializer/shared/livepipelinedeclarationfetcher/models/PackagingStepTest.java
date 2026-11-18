@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class PackageOCIImageToGHCRStepTest {
+class PackagingStepTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"aarch64-linux", "x86_64-linux"})
@@ -19,8 +19,8 @@ class PackageOCIImageToGHCRStepTest {
                 [{"repositoryName":"owner/pure-java","branch":"main","platform":"%s"}]
                 """.replace("%s", platform);
         LivePipelineDeclaration declaration = parsePipeline(packagingStep(target));
-        PackageOCIImageToGHCRStep step = assertInstanceOf(
-                PackageOCIImageToGHCRStep.class,
+        PackagingStep step = assertInstanceOf(
+                PackagingStep.class,
                 declaration.steps().getLast()
         );
         assertEquals("Publish Containers", step.name());

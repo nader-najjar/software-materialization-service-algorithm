@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -11,12 +12,12 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.inject.Inject;
 import io.materializer.pipelineworkflowgeneration.models.BuildMatrixRow;
 import io.materializer.pipelineworkflowgeneration.models.PackagingMatrixRow;
+import io.materializer.shared.livepipelinedeclarationfetcher.models.ActionReplacement;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.BuildStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineInput;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.DeclaredPipelineStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.LivePipelineDeclaration;
-import io.materializer.shared.livepipelinedeclarationfetcher.models.PackageOCIImageToGHCRStep;
-import io.materializer.shared.livepipelinedeclarationfetcher.models.ReleaseSource;
+import io.materializer.shared.livepipelinedeclarationfetcher.models.PackagingStep;
 import io.materializer.shared.livepipelinedeclarationfetcher.models.RunCompositeActionStep;
 import io.materializer.shared.livepipelineinputsstore.models.LivePipelineInputs;
 import io.materializer.shared.models.RepositorySnapshot;
@@ -102,7 +103,7 @@ public class PipelineWorkflowGenerator {
         return switch (step.operation()) {
             case "build" -> generateBuildJob((BuildStep) step, declaration, inputs);
             case "package-oci-image-to-ghcr" -> generatePackagingJob(
-                    (PackageOCIImageToGHCRStep) step,
+                    (PackagingStep) step,
                     declaration,
                     inputs
             );
@@ -141,7 +142,7 @@ public class PipelineWorkflowGenerator {
     }
 
     private ObjectNode generatePackagingJob(
-            PackageOCIImageToGHCRStep packagingStep,
+            PackagingStep packagingStep,
             LivePipelineDeclaration declaration,
             LivePipelineInputs inputs
     ) throws JsonProcessingException {
@@ -221,15 +222,52 @@ public class PipelineWorkflowGenerator {
             LivePipelineInputs inputs
     ) {
         Map<String, String> replacements = new LinkedHashMap<>();
-        for (Map.Entry<String, ReleaseSource> replacement : action.replacements().entrySet()) {
-            String releaseName = resolveReleaseName(replacement.getValue(), declaration, inputs);
-            replacements.put(replacement.getKey(), releaseName);
+        for (Map.Entry<String, ActionReplacement> replacement : action.replacements().entrySet()) {
+            String value = resolveActionReplacement(replacement.getValue(), declaration, inputs);
+            replacements.put(replacement.getKey(), value);
         }
         return replacements;
     }
 
+    private String resolveActionReplacement(
+            ActionReplacement source,
+            LivePipelineDeclaration declaration,
+            LivePipelineInputs inputs
+    ) {
+        String releaseName = resolveReleaseName(source, declaration, inputs);
+        return switch (source.artifactKind()) {
+            case "release-artifact" -> releaseName;
+            case "oci-image" -> resolveImageReference(source, declaration, releaseName);
+            default -> throw new IllegalArgumentException(
+                    "Unsupported replacement artifact kind: " + source.artifactKind()
+            );
+        };
+    }
+
+    private String resolveImageReference(
+            ActionReplacement source,
+            LivePipelineDeclaration declaration,
+            String releaseName
+    ) {
+        boolean packaged = declaration.steps().size() > 1
+                && declaration.steps().get(1) instanceof PackagingStep packaging
+                && packaging.targets().stream().anyMatch(target ->
+                        target.repositoryName().equalsIgnoreCase(source.repositoryName())
+                                && target.branch().equals(source.branch())
+                                && target.platform().equals(source.platform()));
+
+        if (!packaged) {
+            throw new IllegalArgumentException("No declared OCI image for %s@%s on %s".formatted(
+                    source.repositoryName(),
+                    source.branch(),
+                    source.platform()
+            ));
+        }
+        return "ghcr.io/" + source.repositoryName().toLowerCase(Locale.ROOT) + ":" + releaseName;
+    }
+
     private String resolveReleaseName(
-            ReleaseSource source,
+            ActionReplacement source,
             LivePipelineDeclaration declaration,
             LivePipelineInputs inputs
     ) {

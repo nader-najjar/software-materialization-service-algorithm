@@ -53,6 +53,15 @@ public record LivePipelineDeclaration(
         return steps.getFirst() != null && "build".equals(steps.getFirst().operation());
     }
 
+    @AssertTrue(message = "build may only appear first and packaging may only appear second")
+    @JsonIgnore
+    public boolean isBuildAndPackagingOrderValid() {
+        if (steps == null) { return true; }
+
+        return steps.stream().skip(1).noneMatch(BuildStep.class::isInstance)
+                && steps.stream().skip(2).noneMatch(PackagingStep.class::isInstance);
+    }
+
     public LivePipelineDeclaration {
         repositories = repositories == null
                 ? null
