@@ -27,6 +27,8 @@ class PackagingStepTest {
         assertEquals("package-oci-image-to-ghcr", step.operation());
         assertEquals("PACKAGE_APP_ID", step.clientIdVariable());
         assertEquals("PACKAGE_APP_KEY", step.privateKeySecret());
+        assertEquals("package-owner", step.ghcrUsername());
+        assertEquals("PACKAGE_GHCR_PAT", step.ghcrPATSecret());
         assertEquals(List.of(new ReleaseSource("owner/pure-java", "main", platform)), step.targets());
     }
 
@@ -46,12 +48,13 @@ class PackagingStepTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"null", "\"\"", "\" \""})
-    void requiresPackagingName(String name) {
+    void requiresPackagingNameAndGHCRUsername(String name) {
         String targets = """
                 [{"repositoryName":"owner/pure-java","branch":"main","platform":"aarch64-linux"}]
                 """;
-        String step = packagingStep(targets).replace("\"Publish Containers\"", name);
-        assertThrows(IllegalArgumentException.class, () -> parsePipeline(step));
+        String step = packagingStep(targets);
+        assertThrows(IllegalArgumentException.class, () -> parsePipeline(step.replace("\"Publish Containers\"", name)));
+        assertThrows(IllegalArgumentException.class, () -> parsePipeline(step.replace("\"package-owner\"", name)));
     }
 
     @ParameterizedTest
@@ -69,12 +72,18 @@ class PackagingStepTest {
                 IllegalArgumentException.class,
                 () -> parsePipeline(step.replace("\"PACKAGE_APP_KEY\"", reference))
         );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> parsePipeline(step.replace("\"PACKAGE_GHCR_PAT\"", reference))
+        );
     }
 
     private String packagingStep(String targets) {
         return """
                 {"name":"Publish Containers","operation":"package-oci-image-to-ghcr",
-                 "clientIdVariable":"PACKAGE_APP_ID","privateKeySecret":"PACKAGE_APP_KEY","targets":%s}
+                 "clientIdVariable":"PACKAGE_APP_ID","privateKeySecret":"PACKAGE_APP_KEY",
+                 "ghcrUsername":"package-owner","ghcrPATSecret":"PACKAGE_GHCR_PAT","targets":%s}
                 """.replace("%s", targets);
     }
 

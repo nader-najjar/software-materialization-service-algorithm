@@ -204,6 +204,8 @@ class PipelineWorkflowGeneratorTest {
                 "package-oci-image-to-ghcr",
                 "PACKAGE_APP_ID",
                 "PACKAGE_APP_KEY",
+                "package-owner",
+                "PACKAGE_GHCR_PAT",
                 List.of(new ReleaseSource("OWNER/APP", "release", platform))
         );
         RunCompositeActionStep deploy = new RunCompositeActionStep(
@@ -241,6 +243,11 @@ class PipelineWorkflowGeneratorTest {
     private void assertPackagingCredentials(JsonNode packaging) {
         assertEquals("PACKAGE_APP_ID", packaging.at("/env/CLIENT_ID_VARIABLE").asText());
         assertEquals("PACKAGE_APP_KEY", packaging.at("/env/PRIVATE_KEY_SECRET").asText());
+        assertEquals("package-owner", packaging.at("/env/GHCR_USERNAME").asText());
+        assertEquals("PACKAGE_GHCR_PAT", packaging.at("/env/GHCR_PAT_SECRET").asText());
+        assertEquals("${{ secrets[env.GHCR_PAT_SECRET] }}", packaging.at("/steps/7/env/GHCR_TOKEN").asText());
+        assertTrue(packaging.at("/steps/7/run").asText().contains("--username \"$GHCR_USERNAME\" --password-stdin"));
+
         JsonNode token = packaging.required("steps").required(3);
         assertEquals("create-repository-token", token.required("id").asText());
         assertEquals("${{ vars[env.CLIENT_ID_VARIABLE] }}", token.at("/with/client-id").asText());

@@ -93,7 +93,8 @@ class LivePipelineDeclarationTest {
 
         String packaging = """
                 {"name":"Package","operation":"package-oci-image-to-ghcr","clientIdVariable":"APP_ID",
-                 "privateKeySecret":"APP_KEY","targets":[{"repositoryName":"owner/pure-java",
+                 "privateKeySecret":"APP_KEY","ghcrUsername":"package-owner","ghcrPATSecret":"PACKAGE_GHCR_PAT",
+                 "targets":[{"repositoryName":"owner/pure-java",
                  "branch":"main","platform":"aarch64-linux"}]}
                 """.strip();
 
